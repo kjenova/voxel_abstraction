@@ -11,11 +11,11 @@ from write_mesh import write_volume_mesh, write_predictions_mesh
 
 random.seed(0x5EED)
 
-n_examples = 4 # 2000
-train_set_ratio = 0.5 # 0.8
-n_epochs = 1
-visualization_each_n_epochs = 1
-batch_size = 2 # 32
+n_examples = 2000
+train_set_ratio = 0.8
+n_epochs = 100
+visualization_each_n_epochs = 10
+batch_size = 32
 n_primitives = 4
 grid_size = 32
 n_samples_per_shape = 10000
@@ -76,9 +76,9 @@ def report(network, batches, epoch):
             n = b.volume.size(0)
 
             if epoch % visualization_each_n_epochs == 0:
-                vertices = predictions_to_mesh(*p)
+                vertices = predictions_to_mesh(*p).cpu().numpy()
                 for j in range(n):
-                    write_predictions_mesh(vertices[j].cpu().numpy(), i + j)
+                    write_predictions_mesh(vertices[j], i + j)
 
             i += n
 

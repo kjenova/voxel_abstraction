@@ -17,12 +17,12 @@ def hamilton_product(q1, q2):
 conj_multiplier = torch.Tensor([1, -1, -1, -1])
 
 def quat_conjugate(quat):
-    return quat * conj_multiplier
+    return quat * conj_multiplier.to(quat.device)
 
 # points: B x P x N x 3, quat/quat_conj: B x P x 4
 def rotate(points, quat, conj):
     [b, p, n] = points.size()[:3]
-    points = torch.cat([torch.zeros(b, p, n, 1), points], dim = -1)
+    points = torch.cat([torch.zeros(b, p, n, 1, device = points.device), points], dim = -1)
     quat = quat.unsqueeze(2).repeat(1, 1, n, 1)
     conj = conj.unsqueeze(2).repeat(1, 1, n, 1)
 

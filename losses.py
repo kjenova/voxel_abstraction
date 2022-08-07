@@ -24,7 +24,7 @@ def consistency(volume, shape, quat, trans, sampler, closest_points_grid):
     [b, grid_size] = volume.size()[:2]
     i = (primitive_points + 1) * ((grid_size - 1) / 2)
     i = i.clamp(0, grid_size - 1).round().long()
-    a = (grid_size ** 3 * torch.arange(0, b))
+    a = (grid_size ** 3 * torch.arange(0, b, device = volume.device))
     b = grid_size ** 2 * i[..., 0]
     c = grid_size * i[..., 1]
     i = a.reshape(-1, 1, 1) + b + c + i[..., 2]

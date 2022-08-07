@@ -63,7 +63,7 @@ def voxels_to_mesh(voxels):
 
 def predictions_to_mesh(shape, quat, trans):
     [b, p] = trans.size()[:2]
-    vertices = torch.zeros(b, p, 8, 3)
+    vertices = torch.zeros(b, p, 8, 3, device = shape.device)
 
     shape = shape.view(b, p, 1, 3).repeat(1, 1, 4, 1)
 

@@ -36,12 +36,13 @@ class CuboidSurface:
         fs = self.n_samples_per_face
 
         # Ali naj bo konstantna dimenzija ploskve pri dani točki enaka 1 ali -1?
-        constant_dimension = torch.Tensor(3, b, p, fs).fill_(0.5).bernoulli()
+        constant_dimension = torch.full((3, b, p, fs), 0.5, device = dims.device).bernoulli()
         constant_dimension = 2 * constant_dimension - 1
 
-        samples = torch.Tensor(b, p, 3, fs, 3).uniform_(-1, 1)
+        samples = torch.empty(b, p, 3, fs, 3, device = dims.device).uniform_(-1, 1)
         for i in range(3):
             samples[:, :, i, :, i] = constant_dimension[i]
 
         samples = samples.reshape(b, p, s, 3)
         return samples * dims.unsqueeze(2).repeat(1, 1, s, 1)
+

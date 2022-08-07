@@ -6,6 +6,7 @@ import numpy as np
 from scipy.ndimage.morphology import binary_erosion
 from skimage import measure
 from skimage.transform import resize
+from tqdm import tqdm
 
 def split_padding(p):
     return (p // 2, p - p // 2)
@@ -148,7 +149,7 @@ def load_shapes(grid_size, n_components, n_sampled_points):
                 pickle.dump(components, file)
 
         shapes = []
-        for v in components[:n_components]:
+        for v in tqdm(components[:n_components]):
             shapes.append(Shape(v, grid_size, n_sampled_points))
 
         with open(shapes_path, 'wb') as file:
