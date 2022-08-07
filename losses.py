@@ -1,0 +1,43 @@
+import torch
+import torch.nn.functional as F
+from transform import world_to_primitive_space, primitive_to_world_space
+from cuboid import CuboidSurface
+
+def coverage(shape, quat, trans, sampled_points):
+    [b, p] = shape.size()[:2]
+    n = sampled_points.size(1)
+    points = sampled_points.unsqueeze(1).repeat(1, p, 1, 1)
+    points = world_to_primitive_space(points, quat, trans)
+
+    shape = shape.unsqueeze(2).repeat(1, 1, n, 1)
+    distance = F.relu(points.abs() - shape).pow(2).sum(-1)
+    distance, _ = distance.min(1)
+    return distance.mean()
+
+def consistency(volume, shape, quat, trans, sampler, closest_points_grid):
+    primitive_points = sampler.sample_points(shape)
+    primitive_points = primitive_to_world_space(primitive_points, quat, trans)
+
+    weights = sampler.get_importance_weights(shape)
+    weights = F.normalize(weights, dim = -1, eps = 1e-6)
+
+    [b, grid_size] = volume.size()[:2]
+    i = (primitive_points + 1) * ((grid_size - 1) / 2)
+    i = i.clamp(0, grid_size - 1).round().long()
+    a = (grid_size ** 3 * torch.arange(0, b))
+    b = grid_size ** 2 * i[..., 0]
+    c = grid_size * i[..., 1]
+    i = a.reshape(-1, 1, 1) + b + c + i[..., 2]
+
+    x, y, z = closest_points_grid.chunk(3, dim = -1)
+    closest_points = torch.stack([x.take(i), y.take(i), z.take(i)], dim = -1)
+    diff = (closest_points - primitive_points).pow(2).sum(-1)
+
+    # Ko je točka znotraj polnega voksla, naj bo razdalja nič:
+    diff = (1 - volume.take(i)) * diff
+    return (diff * weights).mean()
+
+def loss(volume, shape, quat, trans, sampled_points, closest_points_grid, n_samples_per_primitive):
+    cov = coverage(shape, quat, trans, sampled_points)
+    cons = consistency(volume, shape, quat, trans, CuboidSurface(n_samples_per_primitive), closest_points_grid)
+    return cov + cons
