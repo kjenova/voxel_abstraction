@@ -57,6 +57,11 @@ class VolumeFaces:
         voxel_centers += 0.5
         face_centers = voxel_centers + 0.5 * normals
 
+        # Domena normaliziranih koordinat je [-1, 1].
+        # To je naravna izbira, ker dimenzije kvadrata napovedujemo s sigmoidno aktivacijo, in kvadrat
+        # v svojem koordinatnem sistemu parametriziramo kot območje [-w, w] x [-h, h] x [-d, d], kjer
+        # so w, h, in d napovedana širina, višina in globina (točneje napovedujemo polovico dimenzij).
+
         m = max(volume.shape)
         face_centers *= 2 / max(volume.shape)
         face_centers[..., 0] -= volume.shape[0] / m
@@ -86,7 +91,7 @@ class VolumeFaces:
 
     def sample(self, n_points):
         sampled_faces = np.random.randint(self.n_faces, size = n_points)
-        r = np.random.rand(n_points, 1, 2)
+        r = np.random.uniform(-1, 1, (n_points, 1, 2))
         u = np.matmul(r, self.tangents[sampled_faces]).squeeze(1)
         return self.face_centers[sampled_faces] + u
 
