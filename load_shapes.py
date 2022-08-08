@@ -8,6 +8,8 @@ from skimage import measure
 from skimage.transform import resize
 from tqdm import tqdm
 
+np.random.seed(0x5EED)
+
 def split_padding(p):
     return (p // 2, p - p // 2)
 

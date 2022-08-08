@@ -16,6 +16,8 @@ def hamilton_product(q1, q2):
 
 conj_multiplier = torch.Tensor([1, -1, -1, -1])
 
+# Pri enotskem kvaternionu je konjugacija enaka inverzu.
+# Kvaternione smo normalizirali ob napovedi.
 def quat_conjugate(quat):
     return quat * conj_multiplier.to(quat.device)
 
@@ -35,3 +37,21 @@ def quat_rotate(points, quat):
 
 def quat_inverse_rotate(points, quat):
     return rotate(points, quat_conjugate(quat), quat)
+
+if __name__ == "__main__":
+    from pyquaternion import Quaternion
+    import numpy as np
+
+    def get_random_quat():
+        q = Quaternion.random()
+        quat = torch.Tensor(q.elements).float().view(1, 1, 4)
+        return quat, q
+
+    def test_quat_conjugate():
+        quat, _ = get_random_quat()
+        conj = quat_conjugate(quat)
+        dot_p = quat[..., 0] * conj[..., 0] - (quat[..., 1:4] * conj[..., 1:4]).sum(-1)
+        assert (1 - dot_p.mean()).abs().item() < 1e-4, 'Conjugate is incorrect'
+
+    test_quat_conjugate()
+

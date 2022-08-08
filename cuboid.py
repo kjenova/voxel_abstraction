@@ -45,4 +45,3 @@ class CuboidSurface:
 
         samples = samples.reshape(b, p, s, 3)
         return samples * dims.unsqueeze(2).repeat(1, 1, s, 1)
-
