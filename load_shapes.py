@@ -18,45 +18,44 @@ def resize_volume(volume, grid_size):
     volume = np.pad(volume, [split_padding(m - d) for d in volume.shape])
     return resize(volume, [grid_size] * 3, mode = 'constant')
 
+def get_face_data(volume):
+    [w, h, d] = volume.shape
+
+    max_n_faces = 6 * w * h * d
+    voxel_centers = np.zeros((max_n_faces, 3))
+    normals = np.zeros((max_n_faces, 3))
+    tangents = np.zeros((max_n_faces, 2, 3))
+    n_faces = 0
+    for x in range(w):
+        for y in range(h):
+            for z in range(d):
+                if not volume[x, y, z]:
+                    continue
+
+                for side in range(6):
+                    orientation = 1 - 2 * (side % 2)
+                    direction = side // 2
+
+                    u = [x, y, z]
+                    u[direction] += orientation
+
+                    if u[0] < 0 or u[0] >= w or \
+                       u[1] < 0 or u[1] >= h or \
+                       u[2] < 0 or u[2] >= d or \
+                       not volume[u[0], u[1], u[2]]:
+                        voxel_centers[n_faces] = [x, y, z]
+                        normals[n_faces, direction] = orientation
+                        tangents[n_faces, 0, (direction + 1) % 3] = 0.5 * orientation
+                        tangents[n_faces, 1, (direction + 2) % 3] = 0.5 * orientation
+                        n_faces += 1
+
+    return voxel_centers[:n_faces] + 0.5, normals[:n_faces], tangents[:n_faces]
+
 class VolumeFaces:
     def __init__(self, volume):
-        [w, h, d] = volume.shape
+        voxel_centers, normals, tangents = get_face_data(volume)
+        self.n_faces = voxel_centers.shape[0]
 
-        max_n_faces = 6 * w * h * d
-        voxel_centers = np.zeros((max_n_faces, 3))
-        normals = np.zeros((max_n_faces, 3))
-        tangents = np.zeros((max_n_faces, 2, 3))
-        n_faces = 0
-        for x in range(w):
-            for y in range(h):
-                for z in range(d):
-                    if not volume[x, y, z]:
-                        continue
-
-                    for side in range(6):
-                        orientation = 1 - 2 * (side % 2)
-                        direction = side // 2
-
-                        u = [x, y, z]
-                        u[direction] += orientation
-
-                        if u[0] < 0 or u[0] >= w or \
-                           u[1] < 0 or u[1] >= h or \
-                           u[2] < 0 or u[2] >= d or \
-                           not volume[u[0], u[1], u[2]]:
-                            voxel_centers[n_faces] = [x, y, z]
-                            normals[n_faces, direction] = orientation
-                            tangents[n_faces, 0, (direction + 1) % 3] = 0.5 * orientation
-                            tangents[n_faces, 1, (direction + 2) % 3] = 0.5 * orientation
-                            n_faces += 1
-
-        self.n_faces = n_faces
-
-        voxel_centers = voxel_centers[:n_faces]
-        normals = normals[:n_faces]
-        tangents = tangents[:n_faces]
-
-        voxel_centers += 0.5
         face_centers = voxel_centers + 0.5 * normals
 
         # Domena normaliziranih koordinat je [-1, 1].
@@ -163,3 +162,41 @@ def load_shapes(grid_size, n_components, n_sampled_points):
             pickle.dump(shapes, file)
 
     return shapes
+
+if __name__ == "__main__":
+    def test_centers_linspace(n = 10):
+        c1 = centers_linspace(n)
+        c2 = (torch.arange(0, n) + 0.5) * (2 / n) - 1
+        assert torch.allclose(c1, c2), 'center_linspace is incorrect'
+
+    def test_voxel_centers(n = 10):
+        v1 = voxel_center_points([2, 3, 4])
+        v2 = []
+        for x in [-0.5, 0.5]:
+            for y in [-1 + 1/3, .0, 1 - 1/3]:
+                for z in [-1 + 1/4, -1 + 3/4, -1 + 5/4, -1 + 7/4]:
+                    v2.append([x, y, z])
+        assert torch.allclose(v1, torch.Tensor(v2)), 'voxel_center_points is incorrect'
+
+        v1 = torch.zeros(3, 4, 5, 3)
+        for x in range(3):
+            for y in range(4):
+                for z in range(5):
+                    volume = torch.zeros(3, 4, 5, dtype = torch.bool)
+                    volume[x, y, z] = True
+                    voxel_centers, _, _ = get_face_data(volume)
+                    assert voxel_centers.shape == (6, 3)
+                    assert voxel_centers.min(0)[0] == voxel_centers.max(0)[0]
+                    v1[x, y, z] = torch.from_numpy(voxel_centers[0])
+
+        v1 = v1.reshape(-1, 3)
+        v1[:, 0] *= 2 / 3
+        v1[:, 1] *= 2 / 4
+        v1[:, 2] *= 2 / 5
+        v1 = v1 - 1
+
+        v2 = voxel_center_points([3, 4, 5])
+        assert torch.allclose(v1, v2), 'voxel_center_points is incorrect'
+
+    test_centers_linspace()
+    test_voxel_centers()
