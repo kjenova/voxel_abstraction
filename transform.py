@@ -14,3 +14,29 @@ def primitive_to_world_space(points, quat, trans):
 def world_to_primitive_space(points, quat, trans):
     points = points - prepare_trans(trans, points)
     return quat_inverse_rotate(points, quat)
+
+if __name__ == "__main__":
+    import numpy as np
+    from quat_utils import get_random_quat
+
+    def test_transform():
+        points = torch.empty(10, 3, 4, 3).uniform_(-1, 1)
+        quat, _ = get_random_quat(10, 3)
+        trans = torch.empty(10, 3, 3).uniform_(-1, 1)
+        points_2 = primitive_to_world_space(points, quat, trans)
+        points_2 = world_to_primitive_space(points_2, quat, trans)
+        assert (points_2 - points).abs().mean() < 1e-4, 'Transform/Inverse transform is incorrect'
+
+        point = torch.empty(1, 1, 1, 3).uniform_(-1, 1)
+        quat, q = get_random_quat()
+        trans = torch.empty(1, 1, 3).uniform_(-1, 1)
+
+        t1 = primitive_to_world_space(point, quat, trans).squeeze()
+        t2 = torch.Tensor(q.rotate(point.squeeze())).float() + trans.squeeze()
+        assert (t2 - t1).abs().mean() < 1e-4, 'Transform is incorrect'
+
+        t1 = world_to_primitive_space(point, quat, trans).squeeze()
+        t2 = torch.Tensor(q.inverse.rotate((point - trans).squeeze())).float()
+        assert (t2 - t1).abs().mean() < 1e-4, 'Inverse transform is incorrect'
+
+    test_transform()

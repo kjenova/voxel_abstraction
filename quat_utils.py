@@ -38,14 +38,15 @@ def quat_rotate(points, quat):
 def quat_inverse_rotate(points, quat):
     return rotate(points, quat_conjugate(quat), quat)
 
-if __name__ == "__main__":
-    from pyquaternion import Quaternion
-    import numpy as np
+from pyquaternion import Quaternion
 
-    def get_random_quat(b = 1, p = 1):
-        q = Quaternion.random()
-        quat = torch.Tensor(q.elements).float().view(1, 1, 4)
-        return quat.repeat(b, p, 1), q
+def get_random_quat(b = 1, p = 1):
+    q = Quaternion.random()
+    quat = torch.Tensor(q.elements).float().view(1, 1, 4)
+    return quat.repeat(b, p, 1), q
+
+if __name__ == "__main__":
+    import numpy as np
 
     def conjugate_test_helper(prod):
         dot_p = prod[..., 0] - prod[..., 1:4].sum(-1)
