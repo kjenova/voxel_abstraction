@@ -22,7 +22,8 @@ def consistency(volume, shape, quat, trans, sampler, closest_points_grid):
     weights = F.normalize(weights, dim = -1, eps = 1e-6)
 
     [b, grid_size] = volume.size()[:2]
-    i = (primitive_points + 1) * ((grid_size - 1) / 2)
+    min_center = -.5 + .5 / grid_size
+    i = (primitive_points - min_center) * grid_size
     i = i.clamp(0, grid_size - 1).round().long()
     a = (grid_size ** 3 * torch.arange(0, b, device = volume.device))
     b = grid_size ** 2 * i[..., 0]
@@ -41,3 +42,4 @@ def loss(volume, shape, quat, trans, sampled_points, closest_points_grid, n_samp
     cov = coverage(shape, quat, trans, sampled_points)
     cons = consistency(volume, shape, quat, trans, CuboidSurface(n_samples_per_primitive), closest_points_grid)
     return cov + cons
+

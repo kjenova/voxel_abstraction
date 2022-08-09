@@ -31,9 +31,10 @@ class PrimitivesPrediction(nn.Module):
         # self.prob = ParameterPrediction(n_input_channels, n_primitives, 1, [0], nn.Sigmoid())
 
     def forward(self, feature):
-        shape = self.shape(feature)
+        shape = self.shape(feature) * .5
         quat = F.normalize(self.quat(feature), dim = -1)
-        trans = self.trans(feature)
+        trans = self.trans(feature) * .5
         # prob = self.prob(feature)
 
         return shape, quat, trans
+

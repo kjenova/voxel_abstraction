@@ -8,7 +8,8 @@ def write_helper(vertices, faces, filename):
     triangles.export(f'results/{filename}.stl')
 
 def write_volume_mesh(shape, name):
-    write_helper(*shape.volume_faces.get_mesh(), f'{name}_volume')
+    if shape.volume_faces is not None:
+        write_helper(*shape.volume_faces.get_mesh(), f'{name}_volume')
     write_helper(*shape.resized_volume_faces.get_mesh(), f'{name}_resized')
 
 cuboid_faces = np.asarray([ \

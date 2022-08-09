@@ -6,17 +6,19 @@ from volume_encoder import VolumeEncoder
 from primitives import PrimitivesPrediction
 from losses import loss
 from load_shapes import load_shapes, Shape
+from load_shapenet import load_shapenet, ShapeNetShape
 from generate_mesh import predictions_to_mesh
 from write_mesh import write_volume_mesh, write_predictions_mesh
 
 random.seed(0x5EED)
 
+shapenet_dir = 'shapenet/chamferData/02691156' # None
 n_examples = 2000
 train_set_ratio = 0.8
 n_epochs = 100
 visualization_each_n_epochs = 10
 batch_size = 32
-n_primitives = 4
+n_primitives = 6 # 4
 grid_size = 32
 n_samples_per_shape = 10000
 n_samples_per_primitive = 150
@@ -119,7 +121,10 @@ def train(network, train_set, validation_set):
 
         report(network, validation_batches, e)
 
-examples = load_shapes(grid_size, n_examples, n_samples_per_shape)
+if shapenet_dir is None:
+    examples = load_shapes(grid_size, n_examples, n_samples_per_shape)
+else:
+    examples = load_shapenet(shapenet_dir)
 train_set_size = int(train_set_ratio * len(examples))
 train_set = examples[:train_set_size]
 validation_set = examples[train_set_size:]
@@ -130,3 +135,4 @@ for i, shape in enumerate(validation_set):
 network = Network()
 network.to(device)
 train(network, train_set, validation_set)
+

@@ -58,10 +58,8 @@ class VolumeFaces:
 
         face_centers = voxel_centers + 0.5 * normals
 
-        # Domena normaliziranih koordinat je [-1, 1].
-        # To je naravna izbira, ker dimenzije kvadrata napovedujemo s sigmoidno aktivacijo, in kvadrat
-        # v svojem koordinatnem sistemu parametriziramo kot območje [-w, w] x [-h, h] x [-d, d], kjer
-        # so w, h, in d napovedana širina, višina in globina (točneje napovedujemo polovico dimenzij).
+        # Domena normaliziranih koordinat je [-0.5, 0.5].
+        # TODO: Popravi!
 
         m = max(volume.shape)
         face_centers *= 2 / max(volume.shape)

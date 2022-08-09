@@ -1,16 +1,15 @@
 from scipy.io import loadmat
 import glob
-import os
-import numpy as np
+from load_shapes import VolumeFaces
 
 class ShapeNetShape:
-    def __init__(mat):
+    def __init__(self, mat):
+        self.volume = None
         self.resized_volume = mat['Volume']
+        self.volume_faces = None
+        self.resized_volume_faces = VolumeFaces(self.resized_volume)
         self.sampled_points = mat['surfaceSamples']
         self.closest_points = mat['closestPoints']
-        print(self.resized_volume.shape)
-        print(self.sampled_points.shape)
-        print(self.closest_points.shape)
 
 def load_shapenet(directory):
     shapes = []
@@ -19,4 +18,3 @@ def load_shapenet(directory):
         shapes.append(ShapeNetShape(mat))
     return shapes
 
-load_shapenet('...')
