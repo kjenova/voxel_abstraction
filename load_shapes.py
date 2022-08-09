@@ -59,15 +59,14 @@ class VolumeFaces:
         face_centers = voxel_centers + 0.5 * normals
 
         # Domena normaliziranih koordinat je [-0.5, 0.5].
-        # TODO: Popravi!
 
         m = max(volume.shape)
-        face_centers *= 2 / max(volume.shape)
-        face_centers[..., 0] -= volume.shape[0] / m
-        face_centers[..., 1] -= volume.shape[1] / m
-        face_centers[..., 2] -= volume.shape[2] / m
+        face_centers /= max(volume.shape)
+        face_centers[..., 0] -= 0.5 * volume.shape[0] / m
+        face_centers[..., 1] -= 0.5 * volume.shape[1] / m
+        face_centers[..., 2] -= 0.5 * volume.shape[2] / m
 
-        tangents *= 2 / max(volume.shape)
+        tangents /= max(volume.shape)
 
         self.face_centers = face_centers
         self.tangents = tangents
@@ -95,7 +94,7 @@ class VolumeFaces:
         return self.face_centers[sampled_faces] + u
 
 def centers_linspace(n):
-    return torch.linspace(-1 + 1 / n, 1 - 1 / n, n)
+    return torch.linspace(-.5 + .5 / n, .5 - .5 / n, n)
 
 def voxel_center_points(size):
     x = centers_linspace(size[0])
@@ -164,15 +163,15 @@ def load_shapes(grid_size, n_components, n_sampled_points):
 if __name__ == "__main__":
     def test_centers_linspace(n = 10):
         c1 = centers_linspace(n)
-        c2 = (torch.arange(0, n) + 0.5) * (2 / n) - 1
+        c2 = (torch.arange(0, n) + .5) / n - .5
         assert torch.allclose(c1, c2), 'center_linspace is incorrect'
 
     def test_voxel_centers(n = 10):
         v1 = voxel_center_points([2, 3, 4])
         v2 = []
-        for x in [-0.5, 0.5]:
-            for y in [-1 + 1/3, .0, 1 - 1/3]:
-                for z in [-1 + 1/4, -1 + 3/4, -1 + 5/4, -1 + 7/4]:
+        for x in [-.25, .25]:
+            for y in [-.5 + .5/3, .0, .5 - .5/3]:
+                for z in [-.5 + .5 * 1/4, -.5 + .5 * 3/4, -.5 + .5 * 5/4, -.5 + .5 *  7/4]:
                     v2.append([x, y, z])
         assert torch.allclose(v1, torch.Tensor(v2)), 'voxel_center_points is incorrect'
 
@@ -188,10 +187,10 @@ if __name__ == "__main__":
                     v1[x, y, z] = torch.from_numpy(voxel_centers[0])
 
         v1 = v1.reshape(-1, 3)
-        v1[:, 0] *= 2 / 3
-        v1[:, 1] *= 2 / 4
-        v1[:, 2] *= 2 / 5
-        v1 = v1 - 1
+        v1[:, 0] /= 3
+        v1[:, 1] /= 4
+        v1[:, 2] /= 5
+        v1 = v1 - 0.5
 
         v2 = voxel_center_points([3, 4, 5])
         assert torch.allclose(v1, v2), 'voxel_center_points is incorrect'
