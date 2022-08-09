@@ -1,3 +1,4 @@
+import torch
 from scipy.io import loadmat
 import glob
 from load_shapes import VolumeFaces
@@ -9,7 +10,7 @@ class ShapeNetShape:
         self.volume_faces = None
         self.resized_volume_faces = VolumeFaces(self.resized_volume)
         self.sampled_points = mat['surfaceSamples']
-        self.closest_points = mat['closestPoints']
+        self.closest_points = torch.from_numpy(mat['closestPoints'])
 
 def load_shapenet(directory):
     shapes = []

@@ -24,7 +24,8 @@ n_samples_per_shape = 10000
 n_samples_per_primitive = 150
 learning_rate = 1e-4
 
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+# cuda:1 = Titan X
+device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
 class Network(nn.Module):
     def __init__(self):

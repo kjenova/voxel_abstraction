@@ -23,7 +23,7 @@ cuboid_faces = np.asarray([ \
 
 colors = np.asarray([ \
     [255, 0, 0, 255], # rdeča \
-    [0, 255,, 255], # zelena \
+    [0, 255, 255, 255], # zelena \
     [0, 0, 255, 255], # modra \
     [255, 165, 0, 255], # oranžna \
     [255, 255, 0, 255], # rumena \
