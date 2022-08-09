@@ -195,6 +195,26 @@ if __name__ == "__main__":
         v2 = voxel_center_points([3, 4, 5])
         assert torch.allclose(v1, v2), 'voxel_center_points is incorrect'
 
+    from generate_mesh import predictions_to_mesh
+    from write_mesh import write_helper, write_predictions_mesh
+
+    def mesh_test(grid_size = 5):
+        for i in range(3):
+            volume = torch.zeros([grid_size] * 3, dtype = torch.bool)
+            inds = [grid_size // 2] * 3
+            inds[i] = 0
+            volume[inds[0], inds[1], inds[2]] = True
+            f = VolumeFaces(volume)
+            write_helper(*f.get_mesh(), f'volume_mesh_{i}')
+
+            shape = torch.Tensor([.5 / grid_size] * 3).reshape(1, 1, 3)
+            quat = torch.Tensor([1, 0, 0, 0]).reshape(1, 1, 4)
+            trans = (torch.Tensor(inds).reshape(1, 1, 3) + .5) / grid_size - 0.5
+            mesh = predictions_to_mesh(shape, quat, trans).numpy()[0]
+            write_predictions_mesh(mesh, f'mesh_{i}')
+
     test_centers_linspace()
     test_voxel_centers()
+    mesh_test()
+
 

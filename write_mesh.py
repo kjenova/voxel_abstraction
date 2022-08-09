@@ -50,7 +50,8 @@ def write_predictions_mesh(vertices, name):
 
         for j in range(8):
             v = vertices[i, j]
-            mtl_lines.append(f'v {v[0]} {v[1]} {v[2]}\n')
+            # 0, 2, 1 je pravilno
+            mtl_lines.append(f'v {v[0]} {v[2]} {v[1]}\n')
 
         for j in range(6):
             f = cuboid_faces[j] + 8 * i + 1
@@ -59,16 +60,20 @@ def write_predictions_mesh(vertices, name):
     with open(f'results/{filename}', 'w') as f:
         f.writelines(mtl_lines)
 
-def test():
-    vertices = np.zeros((8, 3))
+if __name__ == "__main__":
+    def test():
+        vertices = np.zeros((8, 3))
 
-    vertices[[0, 1, 4, 5], 0] = 1
-    vertices[[2, 3, 6, 7], 0] = -1
+        vertices[[0, 1, 4, 5], 0] = 1
+        vertices[[2, 3, 6, 7], 0] = -1
 
-    vertices[::2, 1] = 1
-    vertices[1::2, 1] = -1
+        vertices[::2, 1] = 5
+        vertices[1::2, 1] = -5
 
-    vertices[:4, 2] = 1
-    vertices[4:, 2] = -1
+        vertices[:4, 2] = 10
+        vertices[4:, 2] = -10
 
-    write_predictions_mesh(vertices.reshape(1, 8, 3), 'test')
+        write_predictions_mesh(vertices.reshape(1, 8, 3), 'test')
+
+    test()
+
