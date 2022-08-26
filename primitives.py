@@ -33,7 +33,7 @@ class PrimitivesPrediction(nn.Module):
     def forward(self, feature):
         shape = self.shape(feature) * .5
         quat = F.normalize(self.quat(feature), dim = -1)
-        trans = self.trans(feature) * .5
+        trans = self.trans(feature)
         # prob = self.prob(feature)
 
         return shape, quat, trans
