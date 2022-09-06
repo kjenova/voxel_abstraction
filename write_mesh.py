@@ -22,16 +22,16 @@ cuboid_faces = np.asarray([ \
 ])
 
 colors = np.asarray([ \
-    [255, 0, 0, 255], # rdeča \
-    [0, 255, 255, 255], # zelena \
-    [0, 0, 255, 255], # modra \
-    [255, 165, 0, 255], # oranžna \
-    [255, 255, 0, 255], # rumena \
-    [150, 75, 0, 255], # rjava \
-    [255, 105, 180, 255], # roza \
-    [128, 128, 128, 255], # siva \
-    [64, 224, 208, 255], # turkizna \
-    [134, 1, 175, 255] # vijolična \
+    [255, 0, 0], # rdeča \
+    [0, 255, 255], # zelena \
+    [0, 0, 255], # modra \
+    [255, 165, 0], # oranžna \
+    [255, 255, 0], # rumena \
+    [150, 75, 0], # rjava \
+    [255, 105, 180], # roza \
+    [128, 128, 128], # siva \
+    [64, 224, 208], # turkizna \
+    [134, 1, 175] # vijolična \
 ], dtype = np.uint8)
 
 def write_predictions_mesh(vertices, name):

@@ -4,7 +4,9 @@ import numpy as np
 import random
 from volume_encoder import VolumeEncoder
 from primitives import PrimitivesPrediction
+from cuboid import CuboidSurface
 from losses import loss
+from reinforce import ReinforceRewardUpdater
 from load_shapes import load_shapes, Shape
 from load_shapenet import load_shapenet, ShapeNetShape
 from generate_mesh import predictions_to_mesh
@@ -14,7 +16,7 @@ random.seed(0x5EED)
 
 shapenet_dir = 'shapenet/chamferData/02691156' # None
 n_examples = 2000
-train_set_ratio = 0.8
+train_set_ratio = .8
 n_epochs = 100
 visualization_each_n_epochs = 10
 batch_size = 32
@@ -23,6 +25,7 @@ grid_size = 32
 n_samples_per_shape = 10000
 n_samples_per_primitive = 150
 learning_rate = 1e-4
+reinforce_baseline_momentum = .9
 
 # cuda:1 = Titan X
 device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
@@ -39,7 +42,7 @@ class Network(nn.Module):
             layers.append(nn.Linear(n, n))
             layers.append(nn.BatchNorm1d(n))
             layers.append(nn.LeakyReLU(0.2, inplace = True))
-    
+
         self.fc_layers = nn.Sequential(*layers)
         self.primitives = PrimitivesPrediction(n, n_primitives)
 
@@ -56,10 +59,7 @@ class Batch:
         self.closest_points = torch.stack([s.closest_points for s in shapes])
 
 def get_batches(shapes):
-    batches = []
-    for i in range(0, len(shapes), batch_size):
-        batches.append(Batch(shapes[i : i + batch_size]))
-    return batches
+    return [Batch(shapes[i : i + batch_size]) for i in range(0, len(shapes), batch_size)]
 
 def report(network, batches, epoch):
     network.eval()
@@ -71,15 +71,15 @@ def report(network, batches, epoch):
             sampled_points = b.sampled_points.to(device)
             closest_points = b.closest_points.to(device)
 
-            p = network(volume)
-            l = loss(volume, *p, sampled_points, closest_points, n_samples_per_primitive)
+            P = network(volume)
+            l = loss(volume, P, sampled_points, closest_points, n_samples_per_primitive)
 
-            total_loss += l.item()
+            total_loss += l.mean().item()
 
             n = b.volume.size(0)
 
             if epoch % visualization_each_n_epochs == 0:
-                vertices = predictions_to_mesh(*p).cpu().numpy()
+                vertices = predictions_to_mesh(P).cpu().numpy()
                 for j in range(n):
                     write_predictions_mesh(vertices[j], i + j)
 
@@ -89,13 +89,14 @@ def report(network, batches, epoch):
         print(f'loss: {total_loss}')
 
 def train(network, train_set, validation_set):
-    optimizer = torch.optim.Adam(network.parameters(), lr = learning_rate)
-
+    random.shuffle(train_set)
     train_batches = get_batches(train_set)
-    random.shuffle(train_batches)
 
     validation_batches = get_batches(validation_set)
 
+    optimizer = torch.optim.Adam(network.parameters(), lr = learning_rate)
+    sampler = CuboidSurface(n_samples_per_primitive)
+    reward_updater = ReinforceRewardUpdater(reinforce_baseline_momentum)
     for e in range(1, n_epochs + 1):
         print(f'epoch #{e}')
 
@@ -109,8 +110,17 @@ def train(network, train_set, validation_set):
             sampled_points = b.sampled_points.to(device)
             closest_points = b.closest_points.to(device)
 
-            p = network(volume)
-            l = loss(volume, *p, sampled_points, closest_points, n_samples_per_primitive)
+            P = network(volume)
+            l = loss(volume, P, sampled_points, closest_points, sampler)
+
+            # reinforce reward se hrani za vsak primitiv posebej!!! popravi!!!
+            n = loss.size(0)
+            for i in range(n):
+                reward = loss + existence_penalty * P.exist[i].sum()
+                reinforce_reward = reward_updater.update(reward)
+                
+
+            l = l.mean()
 
             l.backward()
             optimizer.step()
