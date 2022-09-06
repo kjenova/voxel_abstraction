@@ -61,28 +61,26 @@ class VolumeFaces:
         # Domena normaliziranih koordinat je [-0.5, 0.5].
 
         m = max(volume.shape)
-        face_centers /= max(volume.shape)
+        face_centers /= m
         face_centers[..., 0] -= 0.5 * volume.shape[0] / m
         face_centers[..., 1] -= 0.5 * volume.shape[1] / m
         face_centers[..., 2] -= 0.5 * volume.shape[2] / m
 
-        tangents /= max(volume.shape)
+        tangents /= m
 
         self.face_centers = face_centers
         self.tangents = tangents
 
     def get_mesh(self):
-        n_faces = self.face_centers.shape[0]
-
-        quads_points = np.zeros((n_faces, 4, 3))
+        quads_points = np.zeros((self.n_faces, 4, 3))
         quads_points[:, 0] = self.face_centers - self.tangents[:, 0] - self.tangents[:, 1]
         quads_points[:, 1] = self.face_centers + self.tangents[:, 0] - self.tangents[:, 1]
         quads_points[:, 2] = self.face_centers + self.tangents[:, 0] + self.tangents[:, 1]
         quads_points[:, 3] = self.face_centers - self.tangents[:, 0] + self.tangents[:, 1]
 
         vertices = quads_points.reshape(-1, 3)
-        faces = np.repeat([[[0, 1, 2], [2, 3, 0]]], n_faces, axis = 0)
-        faces += np.arange(0, n_faces * 4, 4).reshape(-1, 1, 1)
+        faces = np.repeat([[[0, 1, 2], [2, 3, 0]]], self.n_faces, axis = 0)
+        faces += np.arange(0, self.n_faces * 4, 4).reshape(-1, 1, 1)
         faces = faces.reshape(-1, 3)
 
         return vertices, faces
@@ -216,5 +214,3 @@ if __name__ == "__main__":
     test_centers_linspace()
     test_voxel_centers()
     mesh_test()
-
-

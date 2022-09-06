@@ -37,4 +37,3 @@ class PrimitivesPrediction(nn.Module):
         # prob = self.prob(feature)
 
         return shape, quat, trans
-

@@ -42,4 +42,3 @@ def loss(volume, shape, quat, trans, sampled_points, closest_points_grid, n_samp
     cov = coverage(shape, quat, trans, sampled_points)
     cons = consistency(volume, shape, quat, trans, CuboidSurface(n_samples_per_primitive), closest_points_grid)
     return cov + cons
-

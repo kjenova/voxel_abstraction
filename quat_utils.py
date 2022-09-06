@@ -81,4 +81,3 @@ if __name__ == "__main__":
     test_quat_conjugate()
     test_hamilton_product()
     test_rotate()
-

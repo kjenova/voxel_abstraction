@@ -76,4 +76,3 @@ if __name__ == "__main__":
         write_predictions_mesh(vertices.reshape(1, 8, 3), 'test')
 
     test()
-

@@ -18,4 +18,3 @@ def load_shapenet(directory):
         mat = loadmat(filename)
         shapes.append(ShapeNetShape(mat))
     return shapes
-

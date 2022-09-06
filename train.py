@@ -136,4 +136,3 @@ for i, shape in enumerate(validation_set):
 network = Network()
 network.to(device)
 train(network, train_set, validation_set)
-
