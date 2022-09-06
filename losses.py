@@ -14,7 +14,7 @@ def coverage(P, sampled_points):
     distance = F.relu(points.abs() - dims).pow(2).sum(-1)
     distance += 1000 * (1 - exist)
     distance, _ = distance.min(1)
-    return distance.mean(1)
+    return distance.mean()
 
 def consistency(volume, P, sampler, closest_points_grid):
     primitive_points = sampler.sample_points(P.dims)
@@ -38,7 +38,7 @@ def consistency(volume, P, sampler, closest_points_grid):
 
     # Ko je točka znotraj polnega voksla, naj bo razdalja nič:
     diff = (1 - volume.take(i)) * diff
-    return (diff * weights).mean(1)
+    return (diff * weights).mean()
 
 def loss(volume, primitives, sampled_points, closest_points_grid, sampler):
     cov = coverage(primitives, sampled_points)

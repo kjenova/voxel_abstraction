@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributions.bernoulli import Bernoulli
 
 class ParameterPrediction(nn.Module):
     def __init__(self, n_input_channels, n_primitives, n_out_features, bias_init = None, nonlinearity = None):
@@ -22,12 +23,12 @@ class ParameterPrediction(nn.Module):
         return x.view(feature.size(0), self.n_primitives, -1)
 
 class Primitives:
-    def __init__(self, dims, quat, trans, prob, exist):
+    def __init__(self, dims, quat, trans, exist, log_prob):
         self.dims = dims
         self.quat = quat
         self.trans = trans
-        self.prob = prob
         self.exist = exist
+        self.log_prob = log_prob
 
 class PrimitivesPrediction(nn.Module):
     def __init__(self, n_input_channels, n_primitives):
@@ -49,8 +50,10 @@ class PrimitivesPrediction(nn.Module):
         # sqrt(3) / 2 + 1 / 2 ~= 1,366. Po tej logiki bi morali 'trans' pomnožiti z delta, ampak za zdaj pustimo tako, kot
         # je v kodi od nileshkulkarni.
         trans = self.trans(feature)
-        prob = self.prob(feature)
+        prob = self.prob(feature).squeeze()
 
-        exist = prob.bernoulli()
+        distr = Bernoulli(prob)
+        exist = distr.sample()
+        log_prob = distr.log_prob(exist)
 
-        return Primitives(dims, quat, trans, prob, exist)
+        return Primitives(dims, quat, trans, exist, log_prob)

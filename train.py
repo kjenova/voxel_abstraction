@@ -26,6 +26,7 @@ n_samples_per_shape = 10000
 n_samples_per_primitive = 150
 learning_rate = 1e-4
 reinforce_baseline_momentum = .9
+existence_penalty = 8e-5
 
 # cuda:1 = Titan X
 device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
@@ -113,15 +114,16 @@ def train(network, train_set, validation_set):
             P = network(volume)
             l = loss(volume, P, sampled_points, closest_points, sampler)
 
-            # reinforce reward se hrani za vsak primitiv posebej!!! popravi!!!
-            n = loss.size(0)
-            for i in range(n):
-                reward = loss + existence_penalty * P.exist[i].sum()
+            p = P.exist.size(1)
+            for i in range(p):
+                # Pri nas 'reward' minimizira, čeprav se ga pri REINFORCE tipično maksimizira.
+                # Edina razlika je v tem, da bi v primeru, da bi nastavili 'reward *= -1', morali
+                # potem še pri gradientu dodati minus.
+                reward = l + existence_penalty * P.exist[:, i].sum()
                 reinforce_reward = reward_updater.update(reward)
-                
+                P.log_prob[:, i] *= reinforce_reward.item()
 
-            l = l.mean()
-
+            P.log_prob.backward()
             l.backward()
             optimizer.step()
 
