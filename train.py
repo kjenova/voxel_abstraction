@@ -120,8 +120,8 @@ def train(network, train_set, validation_set):
                 # Edina razlika je v tem, da bi v primeru, da bi nastavili 'reward *= -1', morali
                 # potem še pri gradientu dodati minus.
                 reward = l + existence_penalty * P.exist[:, i].sum()
-                reinforce_reward = reward_updater.update(reward)
-                P.log_prob[:, i] *= reinforce_reward.item()
+                reinforce_reward = reward_updater.update(reward.item())
+                P.log_prob[:, i] *= reinforce_reward
 
             P.log_prob.backward()
             l.backward()
