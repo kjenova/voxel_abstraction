@@ -21,7 +21,7 @@ def consistency(volume, P, sampler, closest_points_grid):
 
     weights = sampler.get_importance_weights(P.dims)
     weights *= P.exist.unsqueeze(-1)
-    weights = F.normalize(weights, dim = -1, eps = 1e-6)
+    weights /= weights.sum(1, keepdim = True) + 1e-12
 
     [b, grid_size] = volume.size()[:2]
     min_center = -.5 + .5 / grid_size
@@ -38,7 +38,7 @@ def consistency(volume, P, sampler, closest_points_grid):
 
     # Ko je točka znotraj polnega voksla, naj bo razdalja nič:
     diff = (1 - volume.take(i)) * diff
-    return (diff * weights).mean(1)
+    return (diff * weights).sum((1, 2))
 
 def loss(volume, primitives, sampled_points, closest_points_grid, sampler):
     cov = coverage(primitives, sampled_points)

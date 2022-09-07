@@ -77,7 +77,7 @@ def report(network, batches, epoch):
             P = network(volume)
             l = loss(volume, P, sampled_points, closest_points, sampler)
 
-            total_loss += l.item()
+            total_loss += l.mean().item()
 
             n = b.volume.size(0)
 
@@ -125,7 +125,9 @@ def train(network, train_set, validation_set):
                 reinforce_reward = reward_updater.update(reward)
                 P.log_prob[:, i] *= reinforce_reward
 
-            (P.log_prob.mean() + l.mean()).backward()
+            l = l.mean()
+
+            (P.log_prob.mean() + l).backward()
             optimizer.step()
 
             total_loss += l.item()
