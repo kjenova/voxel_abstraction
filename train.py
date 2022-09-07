@@ -63,6 +63,8 @@ def get_batches(shapes):
     return [Batch(shapes[i : i + batch_size]) for i in range(0, len(shapes), batch_size)]
 
 def report(network, batches, epoch):
+    sampler = CuboidSurface(n_samples_per_primitive)
+
     network.eval()
     with torch.no_grad():
         total_loss = .0
@@ -73,9 +75,9 @@ def report(network, batches, epoch):
             closest_points = b.closest_points.to(device)
 
             P = network(volume)
-            l = loss(volume, P, sampled_points, closest_points, n_samples_per_primitive)
+            l = loss(volume, P, sampled_points, closest_points, sampler)
 
-            total_loss += l.mean().item()
+            total_loss += l.item()
 
             n = b.volume.size(0)
 
@@ -123,8 +125,7 @@ def train(network, train_set, validation_set):
                 reinforce_reward = reward_updater.update(reward.item())
                 P.log_prob[:, i] *= reinforce_reward
 
-            P.log_prob.backward()
-            l.backward()
+            (P.log_prob.mean() + l).backward()
             optimizer.step()
 
             total_loss += l.item()

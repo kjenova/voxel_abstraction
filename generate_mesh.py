@@ -4,7 +4,7 @@ from transform import primitive_to_world_space
 
 def predictions_to_mesh(P):
     [b, p] = P.dims.size()[:2]
-    vertices = torch.zeros(b, p, 8, 3, device = dims.device)
+    vertices = torch.zeros(b, p, 8, 3, device = P.dims.device)
 
     dims = P.dims.view(b, p, 1, 3).repeat(1, 1, 4, 1)
 
