@@ -118,14 +118,14 @@ def train(network, train_set, validation_set):
 
             p = P.exist.size(1)
             for i in range(p):
-                # Pri nas 'reward' minimizira, čeprav se ga pri REINFORCE tipično maksimizira.
+                # Pri nas se 'reward' minimizira, čeprav se ga pri REINFORCE tipično maksimizira.
                 # Edina razlika je v tem, da bi v primeru, da bi nastavili 'reward *= -1', morali
                 # potem še pri gradientu dodati minus.
-                reward = l + existence_penalty * P.exist[:, i].sum()
-                reinforce_reward = reward_updater.update(reward.item())
+                reward = l + existence_penalty * P.exist[:, i] # oba člena sta tenzorja dolžine B
+                reinforce_reward = reward_updater.update(reward)
                 P.log_prob[:, i] *= reinforce_reward
 
-            (P.log_prob.sum() + l).backward()
+            (P.log_prob.mean() + l.mean()).backward()
             optimizer.step()
 
             total_loss += l.item()
