@@ -125,7 +125,7 @@ def train(network, train_set, validation_set):
                 reinforce_reward = reward_updater.update(reward.item())
                 P.log_prob[:, i] *= reinforce_reward
 
-            (P.log_prob.mean() + l).backward()
+            (P.log_prob.sum() + l).backward()
             optimizer.step()
 
             total_loss += l.item()
