@@ -1,7 +1,6 @@
 import numpy as np
 import trimesh
 from trimesh import Trimesh
-from generate_mesh import voxels_to_mesh
 
 def write_helper(vertices, faces, filename):
     triangles = Trimesh(vertices, faces)
