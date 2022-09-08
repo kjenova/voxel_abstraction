@@ -22,9 +22,9 @@ visualization_each_n_epochs = 10
 batch_size = 32
 n_primitives = 6 # 4
 grid_size = 32
-n_samples_per_shape = 10000
+n_samples_per_shape = 1000
 n_samples_per_primitive = 150
-learning_rate = 1e-4
+learning_rate = 1e-3
 reinforce_baseline_momentum = .9
 existence_penalty = 8e-5
 
@@ -47,11 +47,11 @@ class Network(nn.Module):
         self.fc_layers = nn.Sequential(*layers)
         self.primitives = PrimitivesPrediction(n, n_primitives)
 
-    def forward(self, volume):
+    def forward(self, volume, predict_existence):
         x = self.encoder(volume.unsqueeze(1))
         x = x.reshape(volume.size(0), self.encoder.n_out_channels)
         x = self.fc_layers(x)
-        return self.primitives(x)
+        return self.primitives(x, predict_existence)
 
 class Batch:
     def __init__(self, shapes):
@@ -62,7 +62,7 @@ class Batch:
 def get_batches(shapes):
     return [Batch(shapes[i : i + batch_size]) for i in range(0, len(shapes), batch_size)]
 
-def report(network, batches, epoch):
+def report(network, batches, epoch, predict_existence):
     sampler = CuboidSurface(n_samples_per_primitive)
 
     network.eval()
@@ -74,7 +74,7 @@ def report(network, batches, epoch):
             sampled_points = b.sampled_points.to(device)
             closest_points = b.closest_points.to(device)
 
-            P = network(volume)
+            P = network(volume, predict_existence)
             l = loss(volume, P, sampled_points, closest_points, sampler)
 
             total_loss += l.mean().item()
@@ -84,14 +84,16 @@ def report(network, batches, epoch):
             if epoch % visualization_each_n_epochs == 0:
                 vertices = predictions_to_mesh(P).cpu().numpy()
                 for j in range(n):
-                    write_predictions_mesh(vertices[j], i + j)
+                    # Pri inferenci vzamemo samo kvadre z verjetnostjo prisotnosti > 0.5:
+                    v = vertices[j, P.probs[j] > 0.5]
+                    write_predictions_mesh(v, i + j)
 
             i += n
 
         total_loss /= len(batches)
         print(f'loss: {total_loss}')
 
-def train(network, train_set, validation_set):
+def train(network, train_set, validation_set, train_existence):
     random.shuffle(train_set)
     train_batches = get_batches(train_set)
 
@@ -100,7 +102,8 @@ def train(network, train_set, validation_set):
     optimizer = torch.optim.Adam(network.parameters(), lr = learning_rate)
     sampler = CuboidSurface(n_samples_per_primitive)
     reward_updater = ReinforceRewardUpdater(reinforce_baseline_momentum)
-    for e in range(1, n_epochs + 1):
+    epochs_offset = n_epochs if train_existence else 0
+    for e in range(epochs_offset + 1, epochs_offset + n_epochs + 1):
         print(f'epoch #{e}')
 
         network.train()
@@ -113,29 +116,32 @@ def train(network, train_set, validation_set):
             sampled_points = b.sampled_points.to(device)
             closest_points = b.closest_points.to(device)
 
-            P = network(volume)
+            P = network(volume, train_existence)
             l = loss(volume, P, sampled_points, closest_points, sampler)
 
-            p = P.exist.size(1)
-            for i in range(p):
-                # Pri nas se 'reward' minimizira, čeprav se ga pri REINFORCE tipično maksimizira.
-                # Edina razlika je v tem, da bi v primeru, da bi nastavili 'reward *= -1', morali
-                # potem še pri gradientu dodati minus.
-                reward = l + existence_penalty * P.exist[:, i] # oba člena sta tenzorja dolžine B
-                reinforce_reward = reward_updater.update(reward)
-                P.log_prob[:, i] *= reinforce_reward
+            if train_existence:
+                p = P.exist.size(1)
+                for i in range(p):
+                    # Pri nas se 'reward' minimizira, čeprav se ga pri REINFORCE tipično maksimizira.
+                    # Edina razlika je v tem, da bi v primeru, da bi nastavili 'reward *= -1', morali
+                    # potem še pri gradientu dodati minus.
+                    reward = l + existence_penalty * P.exist[:, i] # oba člena sta tenzorja dolžine B
+                    reinforce_reward = reward_updater.update(reward)
+                    P.log_prob[:, i] *= reinforce_reward
 
             l = l.mean()
-
-            (P.log_prob.mean() + l).backward()
-            optimizer.step()
-
             total_loss += l.item()
+
+            if train_existence:
+                l += P.log_prob.mean()
+
+            l.backward()
+            optimizer.step()
 
         total_loss /= len(train_batches)
         print(f'train loss: {total_loss}')
 
-        report(network, validation_batches, e)
+        report(network, validation_batches, e, train_existence)
 
 if shapenet_dir is None:
     examples = load_shapes(grid_size, n_examples, n_samples_per_shape)
@@ -150,4 +156,6 @@ for i, shape in enumerate(validation_set):
 
 network = Network()
 network.to(device)
-train(network, train_set, validation_set)
+
+train(network, train_set, validation_set, False)
+train(network, train_set, validation_set, True)

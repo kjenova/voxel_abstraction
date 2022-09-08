@@ -40,7 +40,7 @@ class PrimitivesPrediction(nn.Module):
         self.trans = ParameterPrediction(n_input_channels, n_primitives, 3, nonlinearity = nn.Tanh())
         self.prob = ParameterPrediction(n_input_channels, n_primitives, 1, [0], nn.Sigmoid())
 
-    def forward(self, feature):
+    def forward(self, feature, predict_existence):
         # Dimenzije že kar na tem mestu delimo z 2, kajti drugače bi jih morali na treh različnih mestih.
         # (Pa tudi v kodi, po kateri se zgledujemo, je tako: https://github.com/nileshkulkarni/volumetricPrimitivesPytorch)
         dims = self.dims(feature) * .5
@@ -51,10 +51,15 @@ class PrimitivesPrediction(nn.Module):
         # sqrt(3) / 2 + 1 / 2 ~= 1,366. Po tej logiki bi morali 'trans' pomnožiti z delta, ampak za zdaj pustimo tako, kot
         # je v kodi od nileshkulkarni.
         trans = self.trans(feature)
-        prob = self.prob(feature).squeeze()
 
-        distr = Bernoulli(prob)
-        exist = distr.sample()
-        log_prob = distr.log_prob(exist)
+        if predict_existence:
+            prob = self.prob(feature).squeeze()
+            distr = Bernoulli(prob)
+            exist = distr.sample()
+            log_prob = distr.log_prob(exist)
+        else:
+            prob = torch.ones(features.size(0), features.size(1))
+            exist = prob
+            log_prob = None
 
         return Primitives(dims, quat, trans, exist, prob, log_prob)
