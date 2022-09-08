@@ -17,8 +17,8 @@ random.seed(0x5EED)
 shapenet_dir = 'shapenet/chamferData/02691156' # None
 n_examples = 2000
 train_set_ratio = .8
-n_epochs = 200
-visualization_each_n_epochs = 50
+n_epochs = 20
+visualization_each_n_epochs = 20
 batch_size = 32
 n_primitives = 20
 grid_size = 32
