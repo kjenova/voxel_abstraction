@@ -35,6 +35,8 @@ class PrimitivesPrediction(nn.Module):
     def __init__(self, n_input_channels, n_primitives):
         super().__init__()
 
+        self.n_primitives = n_primitives
+
         self.dims = ParameterPrediction(n_input_channels, n_primitives, 3, [-3, -3, -3], nn.Sigmoid())
         self.quat = ParameterPrediction(n_input_channels, n_primitives, 4, [1, 0, 0, 0])
         self.trans = ParameterPrediction(n_input_channels, n_primitives, 3, nonlinearity = nn.Tanh())
@@ -58,7 +60,7 @@ class PrimitivesPrediction(nn.Module):
             exist = distr.sample()
             log_prob = distr.log_prob(exist)
         else:
-            prob = torch.ones(features.size(0), features.size(1))
+            prob = torch.ones(feature.size(0), self.n_primitives, device = feature.device)
             exist = prob
             log_prob = None
 

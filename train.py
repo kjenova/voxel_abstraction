@@ -17,8 +17,8 @@ random.seed(0x5EED)
 shapenet_dir = 'shapenet/chamferData/02691156' # None
 n_examples = 2000
 train_set_ratio = .8
-n_epochs = 100
-visualization_each_n_epochs = 10
+n_epochs = 200
+visualization_each_n_epochs = 50
 batch_size = 32
 n_primitives = 6 # 4
 grid_size = 32
@@ -85,7 +85,7 @@ def report(network, batches, epoch, predict_existence):
                 vertices = predictions_to_mesh(P).cpu().numpy()
                 for j in range(n):
                     # Pri inferenci vzamemo samo kvadre z verjetnostjo prisotnosti > 0.5:
-                    v = vertices[j, P.probs[j] > 0.5]
+                    v = vertices[j, P.prob[j].cpu() > 0.5]
                     write_predictions_mesh(v, i + j)
 
             i += n
