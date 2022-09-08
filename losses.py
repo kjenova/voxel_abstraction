@@ -33,9 +33,8 @@ def consistency(volume, P, sampler, closest_points_grid):
     weights *= P.exist.unsqueeze(-1)
     weights /= weights.sum(1, keepdim = True) + 1e-7
 
-    i = point_indices(points, volume)
-    x, y, z = closest_points_grid.chunk(3, dim = -1)
-    closest_points = torch.stack([x.take(i), y.take(i), z.take(i)], dim = -1)
+    i = point_indices(primitive_points, volume)
+    closest_points = closest_points_grid.reshape(-1, 3)[i]
     diff = (closest_points - primitive_points).pow(2).sum(-1)
 
     # Ko je točka znotraj polnega voksla, naj bo razdalja nič:
