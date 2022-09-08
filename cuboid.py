@@ -49,7 +49,7 @@ if __name__ == "__main__":
     def test_sampling(n_samples):
         fs = n_samples // 3
 
-        dims = torch.Tensor([[1, 2, 3], [2, 4, 6], [3, 6, 9]]).reshape(1, 3, 3)
+        dims = torch.Tensor([[1, 2, 3], [2, 4, 6], [3, 6, 9]]).unsqueeze(0)
 
         surface = CuboidSurface(n_samples)
         w = surface.get_importance_weights(dims)
@@ -60,5 +60,12 @@ if __name__ == "__main__":
         true_w = true_w.reshape(1, 3, n_samples)
 
         assert torch.allclose(w, true_w), 'get_importance_weights is incorrect'
+
+        sample = surface.sample_points(dims)
+        eps = 1e-6
+
+        for i in range(dims.size(0)):
+            for j in range(3):
+                assert (sample[0, i, :, j].abs() <= dims[0, i, j] + eps).all(), 'sample_points is incorrect'
 
     test_sampling(6)

@@ -11,7 +11,7 @@ def coverage(P, sampled_points):
 
     dims = P.dims.unsqueeze(2).repeat(1, 1, n, 1)
     distance = F.relu(points.abs() - dims).pow(2).sum(-1)
-    distance += 1000 * (1 - P.exist.unsqueeze(-1))
+    distance += 10 * (1 - P.exist.unsqueeze(-1))
     distance, _ = distance.min(1)
     return distance.mean(1)
 
@@ -21,7 +21,7 @@ def consistency(volume, P, sampler, closest_points_grid):
 
     weights = sampler.get_importance_weights(P.dims)
     weights *= P.exist.unsqueeze(-1)
-    weights /= weights.sum(1, keepdim = True) + 1e-12
+    weights /= weights.sum(1, keepdim = True) + 1e-7
 
     [b, grid_size] = volume.size()[:2]
     min_center = -.5 + .5 / grid_size
