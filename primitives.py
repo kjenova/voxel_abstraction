@@ -51,8 +51,9 @@ class PrimitivesPrediction(nn.Module):
         # V ekstremnem primeru se kvader po i-ti dimenziji razteza od - sqrt(3) / 2 do sqrt(3) / 2. Da ga spravimo izven
         # območja našega koordinatnega sistema ([- 1 / 2, 1 / 2]^3), ga moramo po i-ti dimenziji prestaviti vsaj za delta =
         # sqrt(3) / 2 + 1 / 2 ~= 1,366. Po tej logiki bi morali 'trans' pomnožiti z delta, ampak za zdaj pustimo tako, kot
-        # je v kodi od nileshkulkarni.
-        trans = self.trans(feature)
+        # je v kodi od nileshkulkarni. Verjetno je 0.5 zato, ker translacije, ki kvader prestavijo preveč izven koordinatnega
+        # sistema, niso smiselne.
+        trans = self.trans(feature) * .5
 
         if predict_existence:
             prob = self.prob(feature).squeeze()
