@@ -188,7 +188,7 @@ if __name__ == "__main__":
         v1[:, 0] /= 3
         v1[:, 1] /= 4
         v1[:, 2] /= 5
-        v1 = v1 - 0.5
+        v1 = v1 - .5
 
         v2 = voxel_center_points([3, 4, 5])
         assert torch.allclose(v1, v2), 'voxel_center_points is incorrect'
@@ -207,7 +207,7 @@ if __name__ == "__main__":
 
             shape = torch.Tensor([.5 / grid_size] * 3).reshape(1, 1, 3)
             quat = torch.Tensor([1, 0, 0, 0]).reshape(1, 1, 4)
-            trans = (torch.Tensor(inds).reshape(1, 1, 3) + .5) / grid_size - 0.5
+            trans = (torch.Tensor(inds).reshape(1, 1, 3) + .5) / grid_size - .5
             mesh = predictions_to_mesh(shape, quat, trans).numpy()[0]
             write_predictions_mesh(mesh, f'mesh_{i}')
 

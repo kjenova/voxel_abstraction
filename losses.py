@@ -25,7 +25,7 @@ def point_indices(points, volume):
     w = grid_size * i[..., 1]
     return u.reshape(-1, 1, 1) + w + v + i[..., 2]
 
-def consistency(volume, P, sampler, closest_points_grid):
+def _consistency(volume, P, sampler, closest_points_grid):
     primitive_points = sampler.sample_points(P.dims)
     primitive_points = primitive_to_world_space(primitive_points, P.quat, P.trans)
 
@@ -36,6 +36,11 @@ def consistency(volume, P, sampler, closest_points_grid):
     i = point_indices(primitive_points, volume)
     closest_points = closest_points_grid.reshape(-1, 3)[i]
     distance = (closest_points - primitive_points).pow(2).sum(-1)
+
+    return distance, weights
+
+def consistency(volume, P, sampler, closest_points_grid):
+    distance, weights = _consistency(volume, P, sampler, closest_points_grid)
 
     # Ko je točka znotraj polnega voksla, naj bo razdalja nič:
     distance *= (1 - volume.take(i))
@@ -79,5 +84,30 @@ if __name__ == "__main__":
         distance += 10 * (1 - exist.unsqueeze(-1))
         assert distance.mean() < 1e-4, 'coverage is incorrect'
 
+    from primitives import Primitives
+
+    def test_consistency():
+        grid_size = 5
+        volume = torch.zeros([1] + [grid_size] * 3)
+        closest_points_grid = torch.rand([1] + [grid_size] * 3 + [3])
+        dims = torch.zeros(1, 1, 3)
+        quat = torch.Tensor([1, 0, 0, 0]).reshape(1, 1, 4)
+        exist = torch.ones(1, 1)
+
+        for i in range(grid_size):
+            for j in range(grid_size):
+                for k in range(grid_size):
+                    trans = torch.Tensor([i, j, k]).reshape(1, 1, 3)
+                    trans = (trans + .5) / grid_size - .5
+                    P = Primitives(dims, quat, trans, exist, None, None)
+
+                    cons, _ = _consistency(volume, P, CuboidSurface(150), closest_points_grid)
+                    cons = cons.mean()
+                    distance = (trans.reshape(3) - closest_points_grid[i, j, k]).pow(2).sum()
+                    print(cons)
+                    print(distance)
+                    assert torch.allclose(cons, distance), 'consistency is incorrect'
+
     test_point_indices()
     test_coverage()
+    test_consistency()
