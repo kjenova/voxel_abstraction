@@ -35,11 +35,11 @@ def consistency(volume, P, sampler, closest_points_grid):
 
     i = point_indices(primitive_points, volume)
     closest_points = closest_points_grid.reshape(-1, 3)[i]
-    diff = (closest_points - primitive_points).pow(2).sum(-1)
+    distance = (closest_points - primitive_points).pow(2).sum(-1)
 
     # Ko je točka znotraj polnega voksla, naj bo razdalja nič:
-    diff = (1 - volume.take(i)) * diff
-    return (diff * weights).sum((1, 2))
+    distance *= (1 - volume.take(i))
+    return (distance * weights).sum((1, 2))
 
 def loss(volume, primitives, sampled_points, closest_points_grid, sampler):
     cov = coverage(primitives, sampled_points)
@@ -57,5 +57,27 @@ if __name__ == "__main__":
 
         target_indices = torch.arange(0, 2 * 3 * 3 * 3).reshape(2, -1, 1).repeat(1, p, 1)
         assert torch.allclose(indices.reshape(-1), target_indices.reshape(-1)), 'point_indices is incorrect'
-        
+
+    from cuboid import CuboidSurface
+
+    def test_coverage():
+        p = 5
+        dims = torch.rand(1, p, 3) * 0.5
+        quat = torch.empty(1, p, 4).uniform_(-1, 1)
+        quat = F.normalize(quat, dim = -1)
+        trans = torch.empty(1, p, 3).uniform_(-.5, .5)
+        exist = torch.ones(1, p)
+
+        n = 150
+        sampler = CuboidSurface(n)
+        points = sampler.sample_points(dims)
+        points = primitive_to_world_space(points, quat, trans)
+
+        points = world_to_primitive_space(points, quat, trans)
+        dims = dims.unsqueeze(2).repeat(1, 1, n, 1)
+        distance = F.relu(points.abs() - dims).pow(2).sum(-1)
+        distance += 10 * (1 - exist.unsqueeze(-1))
+        assert distance.mean() < 1e-4, 'coverage is incorrect'
+
     test_point_indices()
+    test_coverage()
