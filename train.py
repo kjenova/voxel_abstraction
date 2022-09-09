@@ -60,7 +60,9 @@ class Batch:
         self.closest_points = torch.stack([s.closest_points for s in shapes])
 
 def get_batches(shapes):
-    return [Batch(shapes[i : i + batch_size]) for i in range(0, len(shapes), batch_size)]
+    batches = [Batch(shapes[i : i + batch_size]) for i in range(0, len(shapes), batch_size)]
+    # V paketu morata biti vsaj dva elementa zaradi paketne normalizacije:
+    return batches if batches[-1].volume.size(0) > 1 else batches[:-1]
 
 def report(network, batches, epoch, predict_existence):
     sampler = CuboidSurface(n_samples_per_primitive)
