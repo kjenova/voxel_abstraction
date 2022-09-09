@@ -37,7 +37,7 @@ def write_predictions_mesh(vertices, name):
     mtl_lines = []
     p = vertices.shape[0]
 
-    for i in range(p):
+    for i in range(min(p, colors.shape[0])):
         c = colors[i] / 255
         mtl_lines.append(f'newmtl m{i}\nKd {c[0]} {c[1]} {c[2]}\nKa 0 0 0\n')
 
@@ -45,7 +45,7 @@ def write_predictions_mesh(vertices, name):
     mtl_lines.append(f'mtllib {filename}\n')
 
     for i in range(p):
-        mtl_lines.append(f'usemtl m{i}\n')
+        mtl_lines.append(f'usemtl m{i % colors.shape[0]}\n')
 
         for j in range(8):
             v = vertices[i, j]

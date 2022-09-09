@@ -94,9 +94,6 @@ def report(network, batches, epoch, predict_existence):
         print(f'loss: {total_loss}')
 
 def train(network, train_set, validation_set, train_existence):
-    random.shuffle(train_set)
-    train_batches = get_batches(train_set)
-
     validation_batches = get_batches(validation_set)
 
     optimizer = torch.optim.Adam(network.parameters(), lr = learning_rate)
@@ -105,6 +102,9 @@ def train(network, train_set, validation_set, train_existence):
     epochs_offset = n_epochs if train_existence else 0
     for e in range(epochs_offset + 1, epochs_offset + n_epochs + 1):
         print(f'epoch #{e}')
+
+        random.shuffle(train_set)
+        train_batches = get_batches(train_set)
 
         network.train()
 
