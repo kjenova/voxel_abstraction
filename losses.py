@@ -103,9 +103,7 @@ if __name__ == "__main__":
 
                     cons, _ = _consistency(volume, P, CuboidSurface(150), closest_points_grid)
                     cons = cons.mean()
-                    distance = (trans.reshape(3) - closest_points_grid[i, j, k]).pow(2).sum()
-                    print(cons)
-                    print(distance)
+                    distance = (trans.reshape(3) - closest_points_grid[0, i, j, k]).pow(2).sum()
                     assert torch.allclose(cons, distance), 'consistency is incorrect'
 
     test_point_indices()
