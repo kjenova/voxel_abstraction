@@ -12,7 +12,7 @@ class ParameterPrediction(nn.Module):
         self.layer = nn.Linear(n_input_channels, n_primitives * n_out_features)
 
         if bias_init is not None:
-            self.layer.bias.data = torch.Tensor(bias_init).view(1, n_out_features).repeat(1, n_primitives)
+            self.layer.bias.data = torch.Tensor(bias_init).repeat(n_primitives)
 
     def forward(self, feature):
         x = self.layer(feature)
