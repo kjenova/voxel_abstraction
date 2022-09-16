@@ -44,6 +44,12 @@ dims_factors = [0.01, 0.5] # prva in druga faza
 # Ta faktor ima isto nalogo, ampak je za napovedovanje verjetnosti.
 # Nočemo nad kvadrom "obupati" hitreje, kot bi lahko optimizirali ostale
 # parametre.
+# V originalni in Python kodi imajo tudi za prob_factor dve vrednosti
+# (0.001 in 0.2), eno za vsako fazo učenja. Ampak v prvi fazi napovedovanje
+# verjetnosti sploh ne nastopa in parametri za to se posledično ne posodabljajo...
+# Zato sem pustil samo faktor za drugo fazo učenja... Tako parametrov ob prehodu
+# v drugo fazo tudi ni treba množiti s prob_factor[0] / prob_factor[1] (glej
+# funkcijo scale_weights).
 prob_factor = 0.2
 
 # cuda:1 = Titan X
@@ -152,6 +158,14 @@ def report(network, batches, epoch, params):
 
         total_loss /= len(batches)
         print(f'loss: {total_loss}')
+
+def scale_weights(network):
+    # Ker v drugi fazi učenja zamenjamo 'dims_factor', mu tudi prilagodimo cel
+    # 'scale' polno povezanega sloja za napovedovanje dimenzij.
+    m = network.primitives.dims.layer
+    r = dims_factors[0] / dims_factors[1]
+    m.weights.data *= r
+    m.bias.data *= r
 
 def train(network, train_set, validation_set, params):
     validation_batches = get_batches(validation_set)

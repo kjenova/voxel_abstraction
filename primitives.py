@@ -10,7 +10,9 @@ class ParameterPrediction(nn.Module):
 
         self.n_primitives = n_primitives
         self.nonlinearity = nonlinearity
+
         self.layer = nn.Linear(n_input_channels, n_primitives * n_out_features)
+        weights_init(self.layer)
 
         if bias_init is not None:
             self.layer.bias.data = torch.Tensor(bias_init).repeat(n_primitives)
@@ -48,7 +50,7 @@ class PrimitivesPrediction(nn.Module):
         self.prob = ParameterPrediction(n_input_channels, n_primitives, 1, nonlinearity = nn.Sigmoid())
 
         # Odmike pri 'prob' inicializiramo tako, da bo verjetnost prisotnosti prvega kvadra
-        # na začetku ~1, verjetnosti prisotnosti ostalih pa 0,5.
+        # pri features = 0 na začetku ~0,9, verjetnosti prisotnosti ostalih pa 0,5.
         probs_bias = torch.zeros(n_primitives)
         probs_bias[0] = 2.5 / params.prob_factor
         self.prob.layer.bias.data = probs_bias
