@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 import random
 from volume_encoder import VolumeEncoder
+from net_utils import weights_init
 from primitives import PrimitivesPrediction
 from cuboid import CuboidSurface
 from losses import loss
@@ -17,8 +18,9 @@ random.seed(0x5EED)
 shapenet_dir = 'shapenet/chamferData/02691156' # None
 n_examples = 2000
 train_set_ratio = .8
-n_epochs = 20
+n_epochs = 40
 visualization_each_n_epochs = 20
+n_primitives_for_visualization = 10
 batch_size = 32
 n_primitives = 20
 grid_size = 32
@@ -28,30 +30,83 @@ learning_rate = 1e-3
 reinforce_baseline_momentum = .9
 existence_penalty = 8e-5
 
+# S faktorjem 'dims_factor' dosežemo, da je aktivacija za napovedovanje
+# dimenzij bolj "razpotegnjena" (dims = sigmoid(dims_factor * features)).
+# Tako kompenziramo nagnjenje metode k temu, da slabo ujemajoče kvadre
+# samo zmanjša namesto, da bi poiskala boljše translacije in rotacije.
+# Z drugimi besedami: dimenzij se učimo počasneje kot translacije in rotacije
+# (https://github.com/nileshkulkarni/volumetricPrimitivesPytorch/issues/3).
+# Vrednost tega faktorja je večja v drugi fazi, kjer problem zmanjšanja
+# slabo ujemajočih kvadrov ni tako izrazit, saj se jim lahko samo zmanjša
+# verjetnost.
+dims_factors = [0.01, 0.5] # prva in druga faza
+
+# Ta faktor ima isto nalogo, ampak je za napovedovanje verjetnosti.
+# Nočemo nad kvadrom "obupati" hitreje, kot bi lahko optimizirali ostale
+# parametre.
+prob_factor = 0.2
+
 # cuda:1 = Titan X
 device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+
+class NetworkParams:
+    def __init__(self, predict_existence):
+        self.predict_existence = predict_existence
+        self.dims_factor = dims_factors[int(predict_existence)]
+        self.prob_factor = prob_factor
 
 class Network(nn.Module):
     def __init__(self):
         super().__init__()
 
+        # Število aktivacij iz prvega konvolucijskega sloja je 4.
+        # Tretji (končni) konvolucijski sloj ima torej 4 * 2^{3 - 1} = 16
+        # aktivacij. Tako je tudi v referenčni implementaciji v Python-u:
+        # https://github.com/nileshkulkarni/volumetricPrimitivesPytorch/blob/367d2bc3f7d2ec122c4e2066c2ee2a922cf4e0c8/experiments/cadAutoEncCuboids/primSelTsdfChamfer.py#L172.
+        # Vendar v originalni implementaciji v Lua je končno število
+        # aktivacij 64. Tam je namreč 5 konvolucijskih slojev (tako kot v članku), ampak
+        # ugibam, da se zadnja dva izrodita v polno povezani sloj:
+        # https://github.com/shubhtuls/volumetricPrimitives/blob/3d994709925166d55aca32f1b6f448978836a05d/experiments/cadAutoEncCuboids/primSelTsdfChamfer.lua#L126
+        # Pytorch tega ne dovoli, stari torch pa je izgleda dovolil
+        # (drugačne privzete nastavitve za padding?). Dimenzije vhodnega
+        # volumna (32^3) in arhitektura (po vsakem sloju se velikost po
+        # vsaki dimenziji prepolovi z max pool slojem) sta namreč isti.
         self.encoder = VolumeEncoder(3, 4, 1)
-        n = self.encoder.n_out_channels
+        n = self.encoder.n_out_channels  # 16
 
+        # Ker se mi zdi 16 aktivacij res premalo, dodam še dva nivoja,
+        # ki sta funkcionalno enaka kot tista dva izrojena nivoja v Lua implementaciji:
         layers = []
         for _ in range(2):
-            layers.append(nn.Linear(n, n))
+            layers.append(nn.Linear(n, 2 * n))
+            n *= 2
             layers.append(nn.BatchNorm1d(n))
             layers.append(nn.LeakyReLU(0.2, inplace = True))
 
-        self.fc_layers = nn.Sequential(*layers)
-        self.primitives = PrimitivesPrediction(n, n_primitives)
+        n //= 2
 
-    def forward(self, volume, predict_existence):
+        # To so pa predvideni polno povezani sloji:
+        for _ in range(2):
+            linear = nn.Linear(n, n)
+            batch_norm = nn.BatchNorm1d(n)
+
+            # Prejšnjim slojem, ki v originalni implementaciji sodijo v konvolucijski del,
+            # pa pustimo, da se inicializirajo na privzeti način.
+            weights_init(linear)
+            weights_init(batch_norm)
+
+            layers.append(linear)
+            layers.append(batch_norm)
+            layers.append(nn.LeakyReLU(0.2, inplace = True))
+
+        self.fc_layers = nn.Sequential(*layers)
+        self.primitives = PrimitivesPrediction(n, n_primitives, params)
+
+    def forward(self, volume, params):
         x = self.encoder(volume.unsqueeze(1))
         x = x.reshape(volume.size(0), self.encoder.n_out_channels)
         x = self.fc_layers(x)
-        return self.primitives(x, predict_existence)
+        return self.primitives(x, params)
 
 class Batch:
     def __init__(self, shapes):
@@ -64,7 +119,7 @@ def get_batches(shapes):
     # V paketu morata biti vsaj dva elementa zaradi paketne normalizacije:
     return batches if batches[-1].volume.size(0) > 1 else batches[:-1]
 
-def report(network, batches, epoch, predict_existence):
+def report(network, batches, epoch, params):
     sampler = CuboidSurface(n_samples_per_primitive)
 
     network.eval()
@@ -76,7 +131,7 @@ def report(network, batches, epoch, predict_existence):
             sampled_points = b.sampled_points.to(device)
             closest_points = b.closest_points.to(device)
 
-            P = network(volume, predict_existence)
+            P = network(volume, params)
             l = loss(volume, P, sampled_points, closest_points, sampler)
 
             total_loss += l.mean().item()
@@ -86,22 +141,25 @@ def report(network, batches, epoch, predict_existence):
             if epoch % visualization_each_n_epochs == 0:
                 vertices = predictions_to_mesh(P).cpu().numpy()
                 for j in range(n):
+                    if i + j > n_primitives_for_visualization:
+                        break
+
                     # Pri inferenci vzamemo samo kvadre z verjetnostjo prisotnosti > 0.5:
                     v = vertices[j, P.prob[j].cpu() > 0.5]
-                    write_predictions_mesh(v, i + j)
+                    write_predictions_mesh(v, f'e{epoch}_{i + j}')
 
             i += n
 
         total_loss /= len(batches)
         print(f'loss: {total_loss}')
 
-def train(network, train_set, validation_set, train_existence):
+def train(network, train_set, validation_set, params):
     validation_batches = get_batches(validation_set)
 
     optimizer = torch.optim.Adam(network.parameters(), lr = learning_rate)
     sampler = CuboidSurface(n_samples_per_primitive)
     reward_updater = ReinforceRewardUpdater(reinforce_baseline_momentum)
-    epochs_offset = n_epochs if train_existence else 0
+    epochs_offset = n_epochs if params.predict_existence else 0
     for e in range(epochs_offset + 1, epochs_offset + n_epochs + 1):
         print(f'epoch #{e}')
 
@@ -118,10 +176,10 @@ def train(network, train_set, validation_set, train_existence):
             sampled_points = b.sampled_points.to(device)
             closest_points = b.closest_points.to(device)
 
-            P = network(volume, train_existence)
+            P = network(volume, params)
             l = loss(volume, P, sampled_points, closest_points, sampler)
 
-            if train_existence:
+            if params.predict_existence:
                 p = P.exist.size(1)
                 for i in range(p):
                     # Pri nas se 'reward' minimizira, čeprav se ga pri REINFORCE tipično maksimizira.
@@ -134,7 +192,7 @@ def train(network, train_set, validation_set, train_existence):
             l = l.mean()
             total_loss += l.item()
 
-            if train_existence:
+            if params.predict_existence:
                 l += P.log_prob.mean()
 
             l.backward()
@@ -143,7 +201,7 @@ def train(network, train_set, validation_set, train_existence):
         total_loss /= len(train_batches)
         print(f'train loss: {total_loss}')
 
-        report(network, validation_batches, e, train_existence)
+        report(network, validation_batches, e, params)
 
 if shapenet_dir is None:
     examples = load_shapes(grid_size, n_examples, n_samples_per_shape)
@@ -159,5 +217,5 @@ for i, shape in enumerate(validation_set):
 network = Network()
 network.to(device)
 
-train(network, train_set, validation_set, False)
-train(network, train_set, validation_set, True)
+for predict_existence in [False, True]:
+    train(network, train_set, validation_set, predict_existence)

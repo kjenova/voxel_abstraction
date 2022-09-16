@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.bernoulli import Bernoulli
+from net_utils import weights_init
 
 class ParameterPrediction(nn.Module):
     def __init__(self, n_input_channels, n_primitives, n_out_features, bias_init = None, nonlinearity = None):
@@ -14,8 +15,11 @@ class ParameterPrediction(nn.Module):
         if bias_init is not None:
             self.layer.bias.data = torch.Tensor(bias_init).repeat(n_primitives)
 
-    def forward(self, feature):
+    def forward(self, feature, factor = None):
         x = self.layer(feature)
+
+        if factor is not None:
+            x *= factor
 
         if self.nonlinearity is not None:
             x = self.nonlinearity(x)
@@ -32,20 +36,27 @@ class Primitives:
         self.log_prob = log_prob
 
 class PrimitivesPrediction(nn.Module):
-    def __init__(self, n_input_channels, n_primitives):
+    def __init__(self, n_input_channels, n_primitives, params):
         super().__init__()
 
         self.n_primitives = n_primitives
 
-        self.dims = ParameterPrediction(n_input_channels, n_primitives, 3, [-3, -3, -3], nn.Sigmoid())
+        dims_bias = torch.Tensor([-3] * 3) / params.dims_factor
+        self.dims = ParameterPrediction(n_input_channels, n_primitives, 3, dims_bias, nn.Sigmoid())
         self.quat = ParameterPrediction(n_input_channels, n_primitives, 4, [1, 0, 0, 0])
         self.trans = ParameterPrediction(n_input_channels, n_primitives, 3, nonlinearity = nn.Tanh())
-        self.prob = ParameterPrediction(n_input_channels, n_primitives, 1, [0], nn.Sigmoid())
+        self.prob = ParameterPrediction(n_input_channels, n_primitives, 1, nonlinearity = nn.Sigmoid())
 
-    def forward(self, feature, predict_existence):
+        # Odmike pri 'prob' inicializiramo tako, da bo verjetnost prisotnosti prvega kvadra
+        # na začetku ~1, verjetnosti prisotnosti ostalih pa 0,5.
+        probs_bias = torch.zeros(n_primitives)
+        probs_bias[0] = 2.5 / params.prob_factor
+        self.prob.layer.bias.data = probs_bias
+
+    def forward(self, feature, params):
         # Dimenzije že kar na tem mestu delimo z 2, kajti drugače bi jih morali na treh različnih mestih.
         # (Pa tudi v kodi, po kateri se zgledujemo, je tako: https://github.com/nileshkulkarni/volumetricPrimitivesPytorch)
-        dims = self.dims(feature) * .5
+        dims = self.dims(feature, params.dims_factor) * .5
         quat = F.normalize(self.quat(feature), dim = -1)
         # Ker rotacijo opravimo pred translacijo, moramo rotacijo upoštevati pri določanju maksimalne vrednosti translacije.
         # V ekstremnem primeru se kvader po i-ti dimenziji razteza od - sqrt(3) / 2 do sqrt(3) / 2. Da ga spravimo izven
@@ -55,8 +66,8 @@ class PrimitivesPrediction(nn.Module):
         # sistema, niso smiselne.
         trans = self.trans(feature) * .5
 
-        if predict_existence:
-            prob = self.prob(feature).squeeze()
+        if params.predict_existence:
+            prob = self.prob(feature, params.prob_factor).squeeze()
             distr = Bernoulli(prob)
             exist = distr.sample()
             log_prob = distr.log_prob(exist)
