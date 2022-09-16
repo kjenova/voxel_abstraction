@@ -37,13 +37,13 @@ def _consistency(volume, P, sampler, closest_points_grid):
     closest_points = closest_points_grid.reshape(-1, 3)[i]
     distance = (closest_points - primitive_points).pow(2).sum(-1)
 
+    # Ko je točka znotraj polnega voksla, naj bo razdalja nič:
+    distance *= (1 - volume.take(i))
+
     return distance, weights
 
 def consistency(volume, P, sampler, closest_points_grid):
     distance, weights = _consistency(volume, P, sampler, closest_points_grid)
-
-    # Ko je točka znotraj polnega voksla, naj bo razdalja nič:
-    distance *= (1 - volume.take(i))
     return (distance * weights).sum((1, 2))
 
 def loss(volume, primitives, sampled_points, closest_points_grid, sampler):

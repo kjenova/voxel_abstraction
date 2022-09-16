@@ -62,7 +62,7 @@ class NetworkParams:
         self.prob_factor = prob_factor
 
 class Network(nn.Module):
-    def __init__(self):
+    def __init__(self, params):
         super().__init__()
 
         # Število aktivacij iz prvega konvolucijskega sloja je 4.
@@ -88,8 +88,6 @@ class Network(nn.Module):
             n *= 2
             layers.append(nn.BatchNorm1d(n))
             layers.append(nn.LeakyReLU(0.2, inplace = True))
-
-        n //= 2
 
         # To so pa predvideni polno povezani sloji:
         for _ in range(2):
@@ -164,7 +162,7 @@ def scale_weights(network):
     # 'scale' polno povezanega sloja za napovedovanje dimenzij.
     m = network.primitives.dims.layer
     r = dims_factors[0] / dims_factors[1]
-    m.weights.data *= r
+    m.weight.data *= r
     m.bias.data *= r
 
 def train(network, train_set, validation_set, params):
@@ -228,8 +226,8 @@ validation_set = examples[train_set_size:]
 for i, shape in enumerate(validation_set[:n_primitives_for_visualization]):
     write_volume_mesh(shape, i + 1)
 
-network = Network()
+network = Network(NetworkParams(False))
 network.to(device)
 
 for predict_existence in [False, True]:
-    train(network, train_set, validation_set, predict_existence)
+    train(network, train_set, validation_set, NetworkParams(predict_existence))
