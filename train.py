@@ -18,7 +18,7 @@ random.seed(0x5EED)
 shapenet_dir = 'shapenet/chamferData/02691156' # None
 n_examples = 2000
 train_set_ratio = .8
-n_epochs = 30
+n_epochs = 1 # 30
 visualization_each_n_epochs = 10
 n_primitives_for_visualization = 5
 batch_size = 32
@@ -181,6 +181,8 @@ def train(network, train_set, validation_set, params):
         network.train()
 
         total_loss = .0
+        total_prob = .0
+        total_reward = .0
         for b in train_batches:
             optimizer.zero_grad()
 
@@ -192,12 +194,14 @@ def train(network, train_set, validation_set, params):
             l = loss(volume, P, sampled_points, closest_points, sampler)
 
             if params.predict_existence:
-                p = P.exist.size(1)
-                for i in range(p):
+                total_prob += P.prob.mean().item()
+
+                for i in range(n_primitives):
                     # Pri nas se 'reward' minimizira, čeprav se ga pri REINFORCE tipično maksimizira.
                     # Edina razlika je v tem, da bi v primeru, da bi nastavili 'reward *= -1', morali
                     # potem še pri gradientu dodati minus.
                     reward = l + existence_penalty * P.exist[:, i] # oba člena sta tenzorja dolžine B
+                    total_reward += reward.mean().item()
                     reinforce_reward = reward_updater.update(reward)
                     P.log_prob[:, i] *= reinforce_reward
 
@@ -212,6 +216,12 @@ def train(network, train_set, validation_set, params):
 
         total_loss /= len(train_batches)
         print(f'train loss: {total_loss}')
+
+        if params.predict_existence:
+            total_prob /= len(train_batches)
+            total_reward /= n_primitives * len(train_batches)
+            print(f'avg prob: {total_prob}')
+            print(f'avg reward: {total_reward}')
 
         report(network, validation_batches, e, params)
 
