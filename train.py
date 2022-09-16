@@ -225,7 +225,7 @@ train_set_size = int(train_set_ratio * len(examples))
 train_set = examples[:train_set_size]
 validation_set = examples[train_set_size:]
 
-for i, shape in enumerate(validation_set):
+for i, shape in enumerate(validation_set[:n_primitives_for_visualization]):
     write_volume_mesh(shape, i + 1)
 
 network = Network()
