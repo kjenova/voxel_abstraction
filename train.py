@@ -118,12 +118,12 @@ class Batch:
         self.shape_points = torch.stack([torch.from_numpy(s.shape_points) for s in shapes])
         self.closest_points = torch.stack([s.closest_points for s in shapes])
 
-    def get():
-        b = self.shape_points.size(0)
-        sample_indices = torch.randint(0, n_points_per_shape, (b, n_samples_per_primitive))
-        sample_indices += n_samples_per_primitive * torch.arange(0, b)
-        sampled_points = self.shape_points[sample_indices]
-        return (self.volume, sampled_points, self.closest_points)
+    def get(self):
+        [b, n] = self.shape_points.size()[:2]
+        sample_indices = torch.randint(0, n, (b, n_samples_per_shape))
+        sample_indices += n_samples_per_shape * torch.arange(0, b).reshape(-1, 1)
+        sampled_points = self.shape_points.reshape(-1, 3)[sample_indices].to(device)
+        return (self.volume.to(device), sampled_points, self.closest_points.to(device))
 
 def get_batches(shapes):
     batches = [Batch(shapes[i : i + batch_size]) for i in range(0, len(shapes), batch_size)]
@@ -138,9 +138,7 @@ def report(network, batches, epoch, params):
         total_loss = .0
         i = 1
         for b in batches:
-            volume = b.volume.to(device)
-            closest_points = b.closest_points.to(device)
-
+            (volume, sampled_points, closest_points) = b.get()
             P = network(volume, params)
             l = loss(volume, P, sampled_points, closest_points, sampler)
 
@@ -200,10 +198,7 @@ def train(network, train_set, validation_set, params):
         for b in train_batches:
             optimizer.zero_grad()
 
-            volume = b.volume.to(device)
-            sampled_points = b.sampled_points.to(device)
-            closest_points = b.closest_points.to(device)
-
+            (volume, sampled_points, closest_points) = b.get()
             P = network(volume, params)
             l = loss(volume, P, sampled_points, closest_points, sampler)
 
