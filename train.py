@@ -106,7 +106,7 @@ class Network(nn.Module):
     def forward(self, volume, params):
         x = self.encoder(volume.unsqueeze(1))
         x = x.reshape(volume.size(0), self.encoder.n_out_channels)
-        x = self.fc_layers(x)n_epochs if params.predict_existence else 0
+        x = self.fc_layers(x)
         return self.primitives(x, params)
 
 class Batch:
