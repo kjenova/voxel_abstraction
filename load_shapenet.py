@@ -9,7 +9,7 @@ class ShapeNetShape:
         self.resized_volume = mat['Volume']
         self.volume_faces = None
         self.resized_volume_faces = VolumeFaces(self.resized_volume)
-        self.sampled_points = mat['surfaceSamples']
+        self.shape_points = mat['surfaceSamples']
         self.closest_points = torch.from_numpy(mat['closestPoints'])
 
 def load_shapenet(directory):

@@ -115,15 +115,15 @@ def closest_points_grid(volume):
     return centers[inds, :]
 
 class Shape:
-    def __init__(self, volume, grid_size, n_sampled_points):
+    def __init__(self, volume, grid_size, n_points_per_shape):
         self.volume = volume
         self.resized_volume = resize_volume(volume, grid_size)
         self.volume_faces = VolumeFaces(volume)
         self.resized_volume_faces = VolumeFaces(self.resized_volume)
-        self.sampled_points = self.resized_volume_faces.sample(n_sampled_points)
+        self.shape_points = self.resized_volume_faces.sample(n_points_per_shape)
         self.closest_points = closest_points_grid(self.resized_volume)
 
-def load_shapes(grid_size, n_components, n_sampled_points):
+def load_shapes(grid_size, n_components, n_points_per_shape):
     shapes_path = 'shapes.pickle'
     if os.path.exists(shapes_path):
         with open(shapes_path, 'rb') as file:
@@ -151,7 +151,7 @@ def load_shapes(grid_size, n_components, n_sampled_points):
 
         shapes = []
         for v in tqdm(components[:n_components]):
-            shapes.append(Shape(v, grid_size, n_sampled_points))
+            shapes.append(Shape(v, grid_size, n_points_per_shape))
 
         with open(shapes_path, 'wb') as file:
             pickle.dump(shapes, file)

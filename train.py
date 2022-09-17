@@ -24,6 +24,9 @@ n_primitives_for_visualization = 5
 batch_size = 32
 n_primitives = 20
 grid_size = 32
+# Iz vsake oblike smo med predprocesiranjem vzorčili 10.000 točk:
+n_points_per_shape = 10000
+# Vendar naenkrat bomo upoštevali samo 1000 točk (na novo vzorčimo vsako epoho):
 n_samples_per_shape = 1000
 n_samples_per_primitive = 150
 learning_rate = 1e-3
@@ -112,8 +115,15 @@ class Network(nn.Module):
 class Batch:
     def __init__(self, shapes):
         self.volume = torch.stack([torch.from_numpy(s.resized_volume.astype(np.float32)) for s in shapes])
-        self.sampled_points = torch.stack([torch.from_numpy(s.sampled_points) for s in shapes])
+        self.shape_points = torch.stack([torch.from_numpy(s.shape_points) for s in shapes])
         self.closest_points = torch.stack([s.closest_points for s in shapes])
+
+    def get():
+        b = self.shape_points.size(0)
+        sample_indices = torch.randint(0, n_points_per_shape, (b, n_samples_per_primitive))
+        sample_indices += n_samples_per_primitive * torch.arange(0, b)
+        sampled_points = self.shape_points[sample_indices]
+        return (self.volume, sampled_points, self.closest_points)
 
 def get_batches(shapes):
     batches = [Batch(shapes[i : i + batch_size]) for i in range(0, len(shapes), batch_size)]
@@ -129,7 +139,6 @@ def report(network, batches, epoch, params):
         i = 1
         for b in batches:
             volume = b.volume.to(device)
-            sampled_points = b.sampled_points.to(device)
             closest_points = b.closest_points.to(device)
 
             P = network(volume, params)
@@ -226,7 +235,7 @@ def train(network, train_set, validation_set, params):
         report(network, validation_batches, e, params)
 
 if shapenet_dir is None:
-    examples = load_shapes(grid_size, n_examples, n_samples_per_shape)
+    examples = load_shapes(grid_size, n_examples, n_points_per_shape)
 else:
     examples = load_shapenet(shapenet_dir)
 train_set_size = int(train_set_ratio * len(examples))
