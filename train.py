@@ -106,7 +106,7 @@ class Network(nn.Module):
     def forward(self, volume, params):
         x = self.encoder(volume.unsqueeze(1))
         x = x.reshape(volume.size(0), self.encoder.n_out_channels)
-        x = self.fc_layers(x)
+        x = self.fc_layers(x)n_epochs if params.predict_existence else 0
         return self.primitives(x, params)
 
 class Batch:
@@ -173,7 +173,7 @@ def train(network, train_set, validation_set, params):
     optimizer = torch.optim.Adam(network.parameters(), lr = learning_rate)
     sampler = CuboidSurface(n_samples_per_primitive)
     reward_updater = ReinforceRewardUpdater(reinforce_baseline_momentum)
-    epochs_offset = n_epochs if params.predict_existence else 0
+    epochs_offset = params.phase * n_epochs
     for e in range(epochs_offset + 1, epochs_offset + n_epochs + 1):
         print(f'epoch #{e}')
 
@@ -201,7 +201,7 @@ def train(network, train_set, validation_set, params):
                 # Pri nas se 'reward' minimizira, čeprav se ga pri REINFORCE tipično maksimizira.
                 # Edina razlika je v tem, da bi v primeru, da bi nastavili 'reward *= -1', morali
                 # potem še pri gradientu dodati minus.
-                reward = l + existence_penalty * P.exist[:, i] # oba člena sta tenzorja dolžine B
+                reward = l + params.existence_penalty * P.exist[:, i] # oba člena sta tenzorja dolžine B
                 total_reward += reward.mean().item()
                 reinforce_reward = reward_updater.update(reward)
                 P.log_prob[:, i] *= reinforce_reward
