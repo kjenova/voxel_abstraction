@@ -168,6 +168,9 @@ def scale_weights(network):
     _scale_weights(network.primitives.prob.layer, prob_factors)
 
 def train(network, train_set, validation_set, params):
+    if params.phase == 1:
+        scale_weights(network)
+
     validation_batches = get_batches(validation_set)
 
     optimizer = torch.optim.Adam(network.parameters(), lr = learning_rate)
@@ -201,14 +204,14 @@ def train(network, train_set, validation_set, params):
                 # Pri nas se minimizira 'penalty', čeprav se pri REINFORCE tipično maksimizira 'reward'.
                 # Edina razlika je v tem, da bi v primeru, da bi maksimizirali 'reward = - penalty', morali
                 # potem še pri gradientu dodati minus.
-                penalty = l + params.existence_penalty * P.exist[:, i] # oba člena sta tenzorja dolžine B
+                penalty = l + params.existence_penalty * torch.sum(P.exist[:, i])
                 total_penalty += penalty.mean().item()
                 P.log_prob[:, i] *= reinforce_updater.update(penalty)
 
             l = l.mean()
             total_loss += l.item()
 
-            l += P.log_prob.mean()
+            l += P.log_prob.sum()
             l.backward()
             optimizer.step()
 
