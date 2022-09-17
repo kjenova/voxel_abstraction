@@ -5,14 +5,16 @@ from torch.distributions.bernoulli import Bernoulli
 from net_utils import weights_init
 
 class ParameterPrediction(nn.Module):
-    def __init__(self, n_input_channels, n_primitives, n_out_features, bias_init = None, nonlinearity = None):
+    def __init__(self, n_input_channels, n_primitives, n_out_features, bias_init = None, nonlinearity = None, default_weights = False):
         super().__init__()
 
         self.n_primitives = n_primitives
         self.nonlinearity = nonlinearity
 
         self.layer = nn.Linear(n_input_channels, n_primitives * n_out_features)
-        weights_init(self.layer)
+
+        if not default_weights:
+            weights_init(self.layer)
 
         if bias_init is not None:
             self.layer.bias.data = torch.Tensor(bias_init).repeat(n_primitives)
@@ -46,7 +48,7 @@ class PrimitivesPrediction(nn.Module):
         dims_bias = torch.Tensor([-3] * 3) / params.dims_factor
         self.dims = ParameterPrediction(n_input_channels, n_primitives, 3, dims_bias, nn.Sigmoid())
         self.quat = ParameterPrediction(n_input_channels, n_primitives, 4, [1, 0, 0, 0])
-        self.trans = ParameterPrediction(n_input_channels, n_primitives, 3, nonlinearity = nn.Tanh())
+        self.trans = ParameterPrediction(n_input_channels, n_primitives, 3, nonlinearity = nn.Tanh(), default_weights = True)
         self.prob = ParameterPrediction(n_input_channels, n_primitives, 1, nonlinearity = nn.Sigmoid())
 
         # Odmike pri 'prob' inicializiramo tako, da bo verjetnost prisotnosti prvega kvadra
