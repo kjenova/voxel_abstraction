@@ -172,7 +172,7 @@ def train(network, train_set, validation_set, params):
 
     optimizer = torch.optim.Adam(network.parameters(), lr = learning_rate)
     sampler = CuboidSurface(n_samples_per_primitive)
-    reward_updater = ReinforceRewardUpdater(reinforce_baseline_momentum)
+    reinforce_updater = ReinforceRewardUpdater(reinforce_baseline_momentum)
     epochs_offset = params.phase * n_epochs
     for e in range(epochs_offset + 1, epochs_offset + n_epochs + 1):
         print(f'epoch #{e}')
@@ -184,7 +184,7 @@ def train(network, train_set, validation_set, params):
 
         total_loss = .0
         total_prob = .0
-        total_reward = .0
+        total_penalty = .0
         for b in train_batches:
             optimizer.zero_grad()
 
@@ -198,13 +198,12 @@ def train(network, train_set, validation_set, params):
             total_prob += P.prob.mean().item()
 
             for i in range(n_primitives):
-                # Pri nas se 'reward' minimizira, čeprav se ga pri REINFORCE tipično maksimizira.
-                # Edina razlika je v tem, da bi v primeru, da bi nastavili 'reward *= -1', morali
+                # Pri nas se minimizira 'penalty', čeprav se pri REINFORCE tipično maksimizira 'reward'.
+                # Edina razlika je v tem, da bi v primeru, da bi maksimizirali 'reward = - penalty', morali
                 # potem še pri gradientu dodati minus.
-                reward = l + params.existence_penalty * P.exist[:, i] # oba člena sta tenzorja dolžine B
-                total_reward += reward.mean().item()
-                reinforce_reward = reward_updater.update(reward)
-                P.log_prob[:, i] *= reinforce_reward
+                penalty = l + params.existence_penalty * P.exist[:, i] # oba člena sta tenzorja dolžine B
+                total_penalty += penalty.mean().item()
+                P.log_prob[:, i] *= reinforce_updater.update(penalty)
 
             l = l.mean()
             total_loss += l.item()
@@ -215,11 +214,11 @@ def train(network, train_set, validation_set, params):
 
         total_loss /= len(train_batches)
         total_prob /= len(train_batches)
-        total_reward /= n_primitives * len(train_batches)
+        total_penalty /= n_primitives * len(train_batches)
 
         print(f'train loss: {total_loss}')
         print(f'avg prob: {total_prob}')
-        print(f'avg reward: {total_reward}')
+        print(f'avg penalty: {total_penalty}')
 
         report(network, validation_batches, e, params)
 
