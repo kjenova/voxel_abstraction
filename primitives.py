@@ -68,14 +68,9 @@ class PrimitivesPrediction(nn.Module):
         # sistema, niso smiselne.
         trans = self.trans(feature) * .5
 
-        if params.predict_existence:
-            prob = self.prob(feature, params.prob_factor).squeeze()
-            distr = Bernoulli(prob)
-            exist = distr.sample()
-            log_prob = distr.log_prob(exist)
-        else:
-            prob = torch.ones(feature.size(0), self.n_primitives, device = feature.device)
-            exist = prob
-            log_prob = None
+        prob = self.prob(feature, params.prob_factor).squeeze()
+        distr = Bernoulli(prob)
+        exist = distr.sample()
+        log_prob = distr.log_prob(exist)
 
         return Primitives(dims, quat, trans, exist, prob, log_prob)

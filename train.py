@@ -15,10 +15,10 @@ from write_mesh import write_volume_mesh, write_predictions_mesh
 
 random.seed(0x5EED)
 
-shapenet_dir = 'shapenet/chamferData/02691156' # None
+shapenet_dir = 'shapenet/chamferData/02691156' # None = mitohondriji
 n_examples = 2000
 train_set_ratio = .8
-n_epochs = 1 # 30
+n_epochs = 30
 visualization_each_n_epochs = 10
 n_primitives_for_visualization = 5
 batch_size = 32
@@ -28,7 +28,6 @@ n_samples_per_shape = 1000
 n_samples_per_primitive = 150
 learning_rate = 1e-3
 reinforce_baseline_momentum = .9
-existence_penalty = 8e-5
 
 # S faktorjem 'dims_factor' dosežemo, da je aktivacija za napovedovanje
 # dimenzij bolj "razpotegnjena" (dims = sigmoid(dims_factor * features)).
@@ -42,24 +41,22 @@ existence_penalty = 8e-5
 dims_factors = [0.01, 0.5] # prva in druga faza
 
 # Ta faktor ima isto nalogo, ampak je za napovedovanje verjetnosti.
-# Nočemo nad kvadrom "obupati" hitreje, kot bi lahko optimizirali ostale
-# parametre.
-# V originalni in Python kodi imajo tudi za prob_factor dve vrednosti
-# (0.001 in 0.2), eno za vsako fazo učenja. Ampak v prvi fazi napovedovanje
-# verjetnosti sploh ne nastopa in parametri za to se posledično ne posodabljajo...
-# Zato sem pustil samo faktor za drugo fazo učenja... Tako parametrov ob prehodu
-# v drugo fazo tudi ni treba množiti s prob_factor[0] / prob_factor[1] (glej
-# funkcijo scale_weights).
-prob_factor = 0.2
+# V prvi fazi učenja je faktor zelo majhen, saj poskusim optimizirati ostale
+# parametre, preden dovolimo, da se nad kvadrom "obupa".
+prob_factors = [0.0001, 0.2]
+
+# V drugi fazi tudi rahlo penaliziramo prisotnost.
+existence_penalties = [.0, 8e-5]
 
 # cuda:1 = Titan X
 device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
 class NetworkParams:
-    def __init__(self, predict_existence):
-        self.predict_existence = predict_existence
-        self.dims_factor = dims_factors[int(predict_existence)]
-        self.prob_factor = prob_factor
+    def __init__(self, phase):
+        self.phase = phase
+        self.dims_factor = dims_factors[phase]
+        self.prob_factor = prob_factors[phase]
+        self.existence_penalty = existence_penalties[phase]
 
 class Network(nn.Module):
     def __init__(self, params):
@@ -157,13 +154,18 @@ def report(network, batches, epoch, params):
         total_loss /= len(batches)
         print(f'loss: {total_loss}')
 
+def _scale_weights(m, f):
+    r = f[0] / f[1]
+    m.weight.data *= r
+    m.bias.data *= r
+
 def scale_weights(network):
     # Ker v drugi fazi učenja zamenjamo 'dims_factor', mu tudi prilagodimo cel
     # 'scale' polno povezanega sloja za napovedovanje dimenzij.
-    m = network.primitives.dims.layer
-    r = dims_factors[0] / dims_factors[1]
-    m.weight.data *= r
-    m.bias.data *= r
+    _scale_weights(network.primitives.dims.layer, dims_factors)
+
+    # Enako za 'prob_factor'.
+    _scale_weights(network.primitives.prob.layer, prob_factors)
 
 def train(network, train_set, validation_set, params):
     validation_batches = get_batches(validation_set)
@@ -193,35 +195,31 @@ def train(network, train_set, validation_set, params):
             P = network(volume, params)
             l = loss(volume, P, sampled_points, closest_points, sampler)
 
-            if params.predict_existence:
-                total_prob += P.prob.mean().item()
+            total_prob += P.prob.mean().item()
 
-                for i in range(n_primitives):
-                    # Pri nas se 'reward' minimizira, čeprav se ga pri REINFORCE tipično maksimizira.
-                    # Edina razlika je v tem, da bi v primeru, da bi nastavili 'reward *= -1', morali
-                    # potem še pri gradientu dodati minus.
-                    reward = l + existence_penalty * P.exist[:, i] # oba člena sta tenzorja dolžine B
-                    total_reward += reward.mean().item()
-                    reinforce_reward = reward_updater.update(reward)
-                    P.log_prob[:, i] *= reinforce_reward
+            for i in range(n_primitives):
+                # Pri nas se 'reward' minimizira, čeprav se ga pri REINFORCE tipično maksimizira.
+                # Edina razlika je v tem, da bi v primeru, da bi nastavili 'reward *= -1', morali
+                # potem še pri gradientu dodati minus.
+                reward = l + existence_penalty * P.exist[:, i] # oba člena sta tenzorja dolžine B
+                total_reward += reward.mean().item()
+                reinforce_reward = reward_updater.update(reward)
+                P.log_prob[:, i] *= reinforce_reward
 
             l = l.mean()
             total_loss += l.item()
 
-            if params.predict_existence:
-                l += P.log_prob.mean()
-
+            l += P.log_prob.mean()
             l.backward()
             optimizer.step()
 
         total_loss /= len(train_batches)
-        print(f'train loss: {total_loss}')
+        total_prob /= len(train_batches)
+        total_reward /= n_primitives * len(train_batches)
 
-        if params.predict_existence:
-            total_prob /= len(train_batches)
-            total_reward /= n_primitives * len(train_batches)
-            print(f'avg prob: {total_prob}')
-            print(f'avg reward: {total_reward}')
+        print(f'train loss: {total_loss}')
+        print(f'avg prob: {total_prob}')
+        print(f'avg reward: {total_reward}')
 
         report(network, validation_batches, e, params)
 
@@ -236,8 +234,8 @@ validation_set = examples[train_set_size:]
 for i, shape in enumerate(validation_set[:n_primitives_for_visualization]):
     write_volume_mesh(shape, i + 1)
 
-network = Network(NetworkParams(False))
+network = Network(NetworkParams(0))
 network.to(device)
 
-for predict_existence in [False, True]:
-    train(network, train_set, validation_set, NetworkParams(predict_existence))
+for phase in range(2):
+    train(network, train_set, validation_set, NetworkParams(phase))
