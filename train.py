@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import random
+import matplotlib.pyplot as plt
 from volume_encoder import VolumeEncoder
 from net_utils import weights_init
 from primitives import PrimitivesPrediction
@@ -162,7 +163,28 @@ class Stats:
         self.penalty_means = np.zeros(total_n_iters)
 
     def save_plots(self):
-        pass
+        x = np.arange(1, sum(n_iterations) + 1)
+
+        plt.figure(figsize = (20, 5))
+        plt.plot(x, self.cov, label = 'coverage')
+        plt.plot(x, self.cons, label = 'consistency')
+        plt.xlabel('iteration')
+        plt.legend()
+        plt.savefig('graphs/loss.png')
+
+        plt.clf()
+        plt.figure(figsize = (20, 5))
+        plt.plot(x, self.prob_means)
+        plt.xlabel('iteration')
+        plt.ylabel('mean probability')
+        plt.savefig('graphs/probability.png')
+
+        plt.clf()
+        plt.figure(figsize = (20, 5))
+        plt.plot(x, self.penalty_means)
+        plt.xlabel('iteration')
+        plt.ylabel('penalty')
+        plt.savefig('graphs/penalty.png')
 
 def _scale_weights(m, f):
     r = f[0] / f[1]
@@ -222,7 +244,7 @@ def train(network, batch_provider, params, stats):
             mean_prob = stats.prob_means[i - output_iteration : i].mean()
             mean_penalty = stats.penalty_means[i - output_iteration : i].mean()
 
-            print(f'loss {(cov_mean + cons_mean) / 2}, cov: {cov_mean}, cons: {cons_mean}')
+            print(f'loss {cov_mean + cons_mean}, cov: {cov_mean}, cons: {cons_mean}')
             print(f'mean prob: {mean_prob}')
             print(f'mean penalty: {mean_penalty}')
 
