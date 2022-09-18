@@ -153,7 +153,11 @@ class BatchProvider:
         return (self.loaded_volume, sampled_points, self.loaded_closest_points)
 
     def get_batches_for_visualization(self):
-        return [self.volume[i : i + batch_size] for i in range(0, n_examples_for_visualization, batch_size)]
+        batches = []
+        for i in range(0, n_examples_for_visualization, batch_size):
+            n = min(batch_size, n_examples_for_visualization - i)
+            batches.append(self.volume[i : i + n])
+        return batches
 
 class Stats:
     def __init__(self):
