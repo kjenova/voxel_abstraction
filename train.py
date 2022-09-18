@@ -16,11 +16,22 @@ from write_mesh import write_volume_mesh, write_predictions_mesh
 random.seed(0x5EED)
 
 shapenet_dir = 'shapenet/chamferData/02691156' # None = mitohondriji
+# Koliko povezanih komponent vzamemo pri celičnih predelkih
+# (pri ShapeNet-u vzamemo vse učne primere):
 n_examples = 2000
-train_set_ratio = .8
-n_epochs = 30
-visualization_each_n_epochs = 10
-n_primitives_for_visualization = 5
+# Število iteracij treniranja v prvi in drugi fazi:
+n_iterations = [20000, 30000]
+# Toliko iteracij se vsak batch ponovi (t.j. po tolikšnem številu
+# naložimo nov batch), glej 'params.modelIter' v referenčni implementaciji.
+# (Bolj strogo gledano se na toliko iteracij ponovi batch z istimi modeli,
+# ker potem še za vsako iteracijo vzorčimo podmnožico točk na površini oblike.)
+repeat_batch_n_iterations = 2
+# Na vsake toliko iteracij se shrani napovedane primitive:
+visualization_iteration = 10000
+# Na vsake toliko iteracij se izpiše statistika:
+output_iteration = 1000
+# za toliko učnih primerov:
+n_examples_for_visualization = 5
 batch_size = 32
 n_primitives = 20
 grid_size = 32
@@ -54,9 +65,10 @@ existence_penalties = [.0, 8e-5]
 # cuda:1 = Titan X
 device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
-class NetworkParams:
+class PhaseParams:
     def __init__(self, phase):
         self.phase = phase
+        self.n_iterations = n_iterations[phase]
         self.dims_factor = dims_factors[phase]
         self.prob_factor = prob_factors[phase]
         self.existence_penalty = existence_penalties[phase]
@@ -112,23 +124,40 @@ class Network(nn.Module):
         x = self.fc_layers(x)
         return self.primitives(x, params)
 
-class Batch:
+class BatchProvider:
     def __init__(self, shapes):
-        self.volume = torch.stack([torch.from_numpy(s.resized_volume.astype(np.float32)) for s in shapes])
-        self.shape_points = torch.stack([torch.from_numpy(s.shape_points) for s in shapes])
-        self.closest_points = torch.stack([s.closest_points for s in shapes])
+        self.volume = torch.stack([torch.from_numpy(s.resized_volume.astype(np.float32)) for s in shapes]).to(device)
+        self.shape_points = torch.stack([torch.from_numpy(s.shape_points) for s in shapes]).to(device)
+        self.closest_points = torch.stack([s.closest_points for s in shapes]).to(device)
+
+        self.iteration = 0
+
+    def load_examples():
+        n = self.volume.size(0)
+        indices = torch.randint(0, n, (min(batch_size, n),), device = device)
+        self.loaded_volume = self.volume[indices]
+        self.loaded_shape_points = self.shape_points[indices]
+        self.loaded_closest_points = self.closest_points[indices]
 
     def get(self):
-        [b, n] = self.shape_points.size()[:2]
-        sample_indices = torch.randint(0, n, (b, n_samples_per_shape))
-        sample_indices += n_samples_per_shape * torch.arange(0, b).reshape(-1, 1)
-        sampled_points = self.shape_points.reshape(-1, 3)[sample_indices].to(device)
-        return (self.volume.to(device), sampled_points, self.closest_points.to(device))
+        if self.iteration % repeat_batch_n_iters == 0:
+            self.load_examples()
 
-def get_batches(shapes):
-    batches = [Batch(shapes[i : i + batch_size]) for i in range(0, len(shapes), batch_size)]
-    # V paketu morata biti vsaj dva elementa zaradi paketne normalizacije:
-    return batches if batches[-1].volume.size(0) > 1 else batches[:-1]
+        self.iteration += 1
+
+        [b, n] = self.loaded_shape_points.size()[:2]
+        i = torch.randint(0, n, (b, n_samples_per_shape), device = device)
+        i += n_samples_per_shape * torch.arange(0, batch_size).reshape(-1, 1)
+        sampled_points = self.loaded_shape_points.reshape(-1, 3)[sample_indices].to(device)
+        return (self.loaded_volume, sampled_points, self.loaded_closest_points)
+
+class Stats:
+    def __init__(self):
+        total_n_iters = sum(n_iterations)
+        self.cov = np.zeros(total_n_iters)
+        self.cons = np.zeros(total_n_iters)
+        self.prob_means = np.zeros(total_n_iters)
+        self.penalty_means = np.zeros(total_n_iters)
 
 def report(network, batches, epoch, params):
     sampler = CuboidSurface(n_samples_per_primitive)
@@ -149,7 +178,7 @@ def report(network, batches, epoch, params):
             if epoch % visualization_each_n_epochs == 0:
                 vertices = predictions_to_mesh(P).cpu().numpy()
                 for j in range(n):
-                    if i + j > n_primitives_for_visualization:
+                    if i + j > n_examples_for_visualization:
                         break
 
                     # Pri inferenci vzamemo samo kvadre z verjetnostjo prisotnosti > 0.5:
@@ -174,74 +203,72 @@ def scale_weights(network):
     # Enako za 'prob_factor'.
     _scale_weights(network.primitives.prob.layer, prob_factors)
 
-def train(network, train_set, validation_set, params):
+def train(network, batch_provider, params, stats):
     if params.phase == 1:
         scale_weights(network)
-
-    validation_batches = get_batches(validation_set)
 
     optimizer = torch.optim.Adam(network.parameters(), lr = learning_rate)
     sampler = CuboidSurface(n_samples_per_primitive)
     reinforce_updater = ReinforceRewardUpdater(reinforce_baseline_momentum)
-    epochs_offset = params.phase * n_epochs
-    for e in range(epochs_offset + 1, epochs_offset + n_epochs + 1):
-        print(f'epoch #{e}')
 
-        random.shuffle(train_set)
-        train_batches = get_batches(train_set)
+    network.train()
+    for _ in range(params.n_iterations):
+        optimizer.zero_grad()
 
-        network.train()
+        (volume, sampled_points, closest_points) = batch_provider.get()
+        P = network(volume, params)
+        cov, cons = loss(volume, P, sampled_points, closest_points, sampler)
+        l = cov + cons
 
-        total_loss = .0
-        total_prob = .0
+        # Pri nas se minimizira 'penalty', čeprav se pri REINFORCE tipično maksimizira 'reward'.
+        # Edina razlika je v tem, da bi v primeru, da bi maksimizirali 'reward = - penalty', morali
+        # potem še pri gradientu dodati minus.
         total_penalty = .0
-        for b in train_batches:
-            optimizer.zero_grad()
+        for p in range(n_primitives):
+            # Glede na članek bi bila sledeča formula, ampak če bi sledili referenčni implementaciji
+            # bi pa bilo 'l + params.existence_penalty * torch.sum(P.exist[:, p])':
+            # https://github.com/nileshkulkarni/volumetricPrimitivesPytorch/blob/367d2bc3f7d2ec122c4e2066c2ee2a922cf4e0c8/experiments/cadAutoEncCuboids/primSelTsdfChamfer.py#L142
+            penalty = l + params.existence_penalty * P.exist[:, p]
+            total_penalty += penalty.mean().item()
+            P.log_prob[:, p] *= reinforce_updater.update(penalty)
 
-            (volume, sampled_points, closest_points) = b.get()
-            P = network(volume, params)
-            l = loss(volume, P, sampled_points, closest_points, sampler)
+        i = batch_provider.iteration
+        stats.cov[i] = cov.mean()
+        stats.cons[i] = cons.mean()
+        stats.prob_means[i] = P.prob.mean()
+        stats.penalty_means[i] = total_penalty / n_primitives
 
-            total_prob += P.prob.mean().item()
+        # Ker je navaden loss reduciran z .mean(), tudi ta "REINFORCE loss" reduciram z .mean():
+        (l.mean() + P.log_prob.mean()).backward()
+        optimizer.step()
 
-            for i in range(n_primitives):
-                # Pri nas se minimizira 'penalty', čeprav se pri REINFORCE tipično maksimizira 'reward'.
-                # Edina razlika je v tem, da bi v primeru, da bi maksimizirali 'reward = - penalty', morali
-                # potem še pri gradientu dodati minus.
-                penalty = l + params.existence_penalty * P.exist[:, i] # torch.sum(P.exist[:, i])
-                total_penalty += penalty.mean().item()
-                P.log_prob[:, i] *= reinforce_updater.update(penalty)
+        if i % output_iteration == 0:
+            cov_mean = stats.cov[i - output_iteration : i].mean()
+            cons_mean = stats.cov[i - output_iteration : i].mean()
+            mean_prob = stats.prob_means[i - output_iteration : i].mean()
+            mean_penalty = stats.penalty_means[i - output_iteration : i].mean()
 
-            l = l.mean()
-            total_loss += l.item()
-
-            l += P.log_prob.mean() # sum()
-            l.backward()
-            optimizer.step()
-
-        total_loss /= len(train_batches)
-        total_prob /= len(train_batches)
-        total_penalty /= n_primitives * len(train_batches)
-
-        print(f'train loss: {total_loss}')
-        print(f'avg prob: {total_prob}')
-        print(f'avg penalty: {total_penalty}')
+            print(f'loss {(cov_mean + cons_mean) / 2}, cov: {cov_mean}, cons: {cons_mean}')
+            print(f'mean prob: {mean_prob}')
+            print(f'mean penalty: {mean_penalty}')
 
         report(network, validation_batches, e, params)
 
 if shapenet_dir is None:
-    examples = load_shapes(grid_size, n_examples, n_points_per_shape)
+    train_set = load_shapes(grid_size, n_examples, n_points_per_shape)
 else:
-    examples = load_shapenet(shapenet_dir)
-train_set_size = int(train_set_ratio * len(examples))
-train_set = examples[:train_set_size]
-validation_set = examples[train_set_size:]
+    train_set = load_shapenet(shapenet_dir)
 
-for i, shape in enumerate(validation_set[:n_primitives_for_visualization]):
+batch_provider = BatchProvider(train_set)
+stats = Stats()
+
+# Za zdaj bomo vizualizirali kar primere iz učne množice. Tako je tudi v
+# referenčni implementaciji.
+for i, shape in enumerate(train_set[:n_examples_for_visualization]):
     write_volume_mesh(shape, i + 1)
 
-network = Network(NetworkParams(0))
+network = Network(PhaseParams(0))
 network.to(device)
 
 for phase in range(2):
-    train(network, train_set, validation_set, NetworkParams(phase))
+    train(network, batch_provider, PhaseParams(phase), stats)

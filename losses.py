@@ -38,7 +38,7 @@ def _consistency(volume, P, sampler, closest_points_grid):
     distance = (closest_points - primitive_points).pow(2).sum(-1)
 
     # Ko je točka znotraj polnega voksla, naj bo razdalja nič:
-    distance *= (1 - volume.take(i))
+    distance *= 1 - volume.take(i)
 
     return distance, weights
 
@@ -49,7 +49,7 @@ def consistency(volume, P, sampler, closest_points_grid):
 def loss(volume, primitives, sampled_points, closest_points_grid, sampler):
     cov = coverage(primitives, sampled_points)
     cons = consistency(volume, primitives, sampler, closest_points_grid)
-    return cov + cons
+    return cov, cons
 
 if __name__ == "__main__":
     from load_shapes import voxel_center_points
