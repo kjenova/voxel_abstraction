@@ -16,21 +16,21 @@ from write_mesh import write_volume_mesh, write_predictions_mesh
 
 random.seed(0x5EED)
 
-shapenet_dir = 'shapenet/chamferData/02691156' # None = mitohondriji
+shapenet_dir = 'shapenet/chamferData/03001627' # None = mitohondriji
 # Koliko povezanih komponent vzamemo pri celičnih predelkih
 # (pri ShapeNet-u vzamemo vse učne primere):
 n_examples = 2000
 # Število iteracij treniranja v prvi in drugi fazi:
-n_iterations = [20000, 30000]
+n_iterations = [2, 2] # [20000, 30000]
 # Toliko iteracij se vsak batch ponovi (t.j. po tolikšnem številu
 # naložimo nov batch), glej 'params.modelIter' v referenčni implementaciji.
 # (Bolj strogo gledano se na toliko iteracij ponovi batch z istimi modeli,
 # ker potem še za vsako iteracijo vzorčimo podmnožico točk na površini oblike.)
 repeat_batch_n_iterations = 2
 # Na vsake toliko iteracij se shrani napovedane primitive:
-save_mesh_iteration = 10000
+save_mesh_iteration = 1 # 10000
 # Na vsake toliko iteracij se izpiše statistika:
-output_iteration = 1000
+output_iteration = 1 # 1000
 # za toliko učnih primerov:
 n_examples_for_visualization = 5
 batch_size = 32
@@ -133,7 +133,7 @@ class BatchProvider:
 
         self.iteration = 0
 
-    def load_examples():
+    def load_examples(self):
         n = self.volume.size(0)
         indices = torch.randint(0, n, (min(batch_size, n),), device = device)
         self.loaded_volume = self.volume[indices]
@@ -141,18 +141,19 @@ class BatchProvider:
         self.loaded_closest_points = self.closest_points[indices]
 
     def get(self):
-        if self.iteration % repeat_batch_n_iters == 0:
+        if self.iteration % repeat_batch_n_iterations == 0:
             self.load_examples()
 
         self.iteration += 1
 
         [b, n] = self.loaded_shape_points.size()[:2]
         i = torch.randint(0, n, (b, n_samples_per_shape), device = device)
-        i += n_samples_per_shape * torch.arange(0, batch_size).reshape(-1, 1)
-        sampled_points = self.loaded_shape_points.reshape(-1, 3)[sample_indices].to(device)
+        i += n_samples_per_shape * torch.arange(0, batch_size, device = device).reshape(-1, 1)
+        sampled_points = self.loaded_shape_points.reshape(-1, 3)[i].to(device)
         return (self.loaded_volume, sampled_points, self.loaded_closest_points)
 
     def get_batches_for_visualization(self):
+        return [self.volume[i : i + batch_size] for i in range(0, n_examples_for_visualization, batch_size)]
 
 class Stats:
     def __init__(self):
@@ -228,19 +229,20 @@ def train(network, batch_provider, params, stats):
             total_penalty += penalty.mean().item()
             P.log_prob[:, p] *= reinforce_updater.update(penalty)
 
-        i = batch_provider.iteration
+        # Ker je navaden loss reduciran z .mean(), tudi ta "REINFORCE loss" reduciram z .mean():
+        (l.mean() + P.log_prob.mean()).backward()
+        optimizer.step()
+
+        i = batch_provider.iteration - 1
         stats.cov[i] = cov.mean()
         stats.cons[i] = cons.mean()
         stats.prob_means[i] = P.prob.mean()
         stats.penalty_means[i] = total_penalty / n_primitives
 
-        # Ker je navaden loss reduciran z .mean(), tudi ta "REINFORCE loss" reduciram z .mean():
-        (l.mean() + P.log_prob.mean()).backward()
-        optimizer.step()
-
-        if i % output_iteration == 0:
+        if batch_provider.iteration % output_iteration == 0:
+            i += 1
             cov_mean = stats.cov[i - output_iteration : i].mean()
-            cons_mean = stats.cov[i - output_iteration : i].mean()
+            cons_mean = stats.cons[i - output_iteration : i].mean()
             mean_prob = stats.prob_means[i - output_iteration : i].mean()
             mean_penalty = stats.penalty_means[i - output_iteration : i].mean()
 
@@ -248,17 +250,17 @@ def train(network, batch_provider, params, stats):
             print(f'mean prob: {mean_prob}')
             print(f'mean penalty: {mean_penalty}')
 
-        if i % save_mesh_iteration == 0:
+        if batch_provider.iteration % save_mesh_iteration == 0:
             network.eval()
             with torch.no_grad():
                 k = 1
                 for volume_batch in batch_provider.get_batches_for_visualization():
                     X = network(volume_batch, params)
-                    vertices = predictions_to_mesh(X).cpu().numpy()
+                    vertices = predictions_to_mesh(X).cpu()
 
                     for j in range(vertices.size(0)):
                         # Pri inferenci vzamemo samo kvadre z verjetnostjo prisotnosti > 0.5:
-                        v = vertices[j, X.prob[j].cpu() > 0.5]
+                        v = vertices[j, X.prob[j].cpu() > 0.5].numpy()
                         write_predictions_mesh(v, f'i{i}_{k + j}')
 
                     k += vertices.size(0)
