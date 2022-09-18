@@ -21,16 +21,16 @@ shapenet_dir = 'shapenet/chamferData/03001627' # None = mitohondriji
 # (pri ShapeNet-u vzamemo vse učne primere):
 n_examples = 2000
 # Število iteracij treniranja v prvi in drugi fazi:
-n_iterations = [2, 2] # [20000, 30000]
+n_iterations = [20000, 30000]
 # Toliko iteracij se vsak batch ponovi (t.j. po tolikšnem številu
 # naložimo nov batch), glej 'params.modelIter' v referenčni implementaciji.
 # (Bolj strogo gledano se na toliko iteracij ponovi batch z istimi modeli,
 # ker potem še za vsako iteracijo vzorčimo podmnožico točk na površini oblike.)
 repeat_batch_n_iterations = 2
 # Na vsake toliko iteracij se shrani napovedane primitive:
-save_mesh_iteration = 1 # 10000
+save_mesh_iteration = 10000
 # Na vsake toliko iteracij se izpiše statistika:
-output_iteration = 1 # 1000
+output_iteration = 1000
 # za toliko učnih primerov:
 n_examples_for_visualization = 5
 batch_size = 32
@@ -167,11 +167,17 @@ class Stats:
         x = np.arange(1, sum(n_iterations) + 1)
 
         plt.figure(figsize = (20, 5))
-        plt.plot(x, self.cov, label = 'coverage')
-        plt.plot(x, self.cons, label = 'consistency')
+        plt.plot(x, self.cov)
         plt.xlabel('iteration')
-        plt.legend()
-        plt.savefig('graphs/loss.png')
+        plt.ylabel('coverage')
+        plt.savefig('graphs/coverage.png')
+
+        plt.clf()
+        plt.figure(figsize = (20, 5))
+        plt.plot(x, self.cons)
+        plt.xlabel('iteration')
+        plt.ylabel('consistency')
+        plt.savefig('graphs/consistency.png')
 
         plt.clf()
         plt.figure(figsize = (20, 5))
@@ -246,9 +252,10 @@ def train(network, batch_provider, params, stats):
             mean_prob = stats.prob_means[i - output_iteration : i].mean()
             mean_penalty = stats.penalty_means[i - output_iteration : i].mean()
 
-            print(f'loss {cov_mean + cons_mean}, cov: {cov_mean}, cons: {cons_mean}')
-            print(f'mean prob: {mean_prob}')
-            print(f'mean penalty: {mean_penalty}')
+            print(f'---- iteration {i} ----')
+            print(f'    loss {cov_mean + cons_mean}, cov: {cov_mean}, cons: {cons_mean}')
+            print(f'    mean prob: {mean_prob}')
+            print(f'    mean penalty: {mean_penalty}')
 
         if batch_provider.iteration % save_mesh_iteration == 0:
             network.eval()
