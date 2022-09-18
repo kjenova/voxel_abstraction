@@ -27,7 +27,7 @@ n_iterations = [20000, 30000]
 # ker potem še za vsako iteracijo vzorčimo podmnožico točk na površini oblike.)
 repeat_batch_n_iterations = 2
 # Na vsake toliko iteracij se shrani napovedane primitive:
-visualization_iteration = 10000
+save_mesh_iteration = 10000
 # Na vsake toliko iteracij se izpiše statistika:
 output_iteration = 1000
 # za toliko učnih primerov:
@@ -151,6 +151,8 @@ class BatchProvider:
         sampled_points = self.loaded_shape_points.reshape(-1, 3)[sample_indices].to(device)
         return (self.loaded_volume, sampled_points, self.loaded_closest_points)
 
+    def get_batches_for_visualization(self):
+
 class Stats:
     def __init__(self):
         total_n_iters = sum(n_iterations)
@@ -159,36 +161,8 @@ class Stats:
         self.prob_means = np.zeros(total_n_iters)
         self.penalty_means = np.zeros(total_n_iters)
 
-def report(network, batches, epoch, params):
-    sampler = CuboidSurface(n_samples_per_primitive)
-
-    network.eval()
-    with torch.no_grad():
-        total_loss = .0
-        i = 1
-        for b in batches:
-            (volume, sampled_points, closest_points) = b.get()
-            P = network(volume, params)
-            l = loss(volume, P, sampled_points, closest_points, sampler)
-
-            total_loss += l.mean().item()
-
-            n = b.volume.size(0)
-
-            if epoch % visualization_each_n_epochs == 0:
-                vertices = predictions_to_mesh(P).cpu().numpy()
-                for j in range(n):
-                    if i + j > n_examples_for_visualization:
-                        break
-
-                    # Pri inferenci vzamemo samo kvadre z verjetnostjo prisotnosti > 0.5:
-                    v = vertices[j, P.prob[j].cpu() > 0.5]
-                    write_predictions_mesh(v, f'e{epoch}_{i + j}')
-
-            i += n
-
-        total_loss /= len(batches)
-        print(f'loss: {total_loss}')
+    def save_plots(self):
+        pass
 
 def _scale_weights(m, f):
     r = f[0] / f[1]
@@ -252,7 +226,22 @@ def train(network, batch_provider, params, stats):
             print(f'mean prob: {mean_prob}')
             print(f'mean penalty: {mean_penalty}')
 
-        report(network, validation_batches, e, params)
+        if i % save_mesh_iteration == 0:
+            network.eval()
+            with torch.no_grad():
+                k = 1
+                for volume_batch in batch_provider.get_batches_for_visualization():
+                    X = network(volume_batch, params)
+                    vertices = predictions_to_mesh(X).cpu().numpy()
+
+                    for j in range(vertices.size(0)):
+                        # Pri inferenci vzamemo samo kvadre z verjetnostjo prisotnosti > 0.5:
+                        v = vertices[j, X.prob[j].cpu() > 0.5]
+                        write_predictions_mesh(v, f'i{i}_{k + j}')
+
+                    k += vertices.size(0)
+
+            network.train()
 
 if shapenet_dir is None:
     train_set = load_shapes(grid_size, n_examples, n_points_per_shape)
@@ -272,3 +261,5 @@ network.to(device)
 
 for phase in range(2):
     train(network, batch_provider, PhaseParams(phase), stats)
+
+stats.save_plots()
