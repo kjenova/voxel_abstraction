@@ -76,7 +76,28 @@ if __name__ == "__main__":
         quat, q = get_random_quat()
         quat_rotated = quat_rotate(points, quat).squeeze()
         q_rotated = torch.Tensor(q.rotate(points.squeeze().numpy())).float()
-        assert (quat_rotated - q_rotated).abs().mean() < 1e-4, 'Rotation is incorrect'
+        assert (quat_rotated - q_rotated).abs().mean() < 1e-4, 'Rotation is incorrect (1)'
+
+        b = 2
+        p = 3
+        n = 5
+        points = torch.empty(b, p, n, 3).uniform_(-1, 1)
+        quats = torch.zeros(b, p, 4)
+        qs = []
+        for i in range(b):
+            qsi = []
+            for j in range(p):
+                quat, q = get_random_quat()
+                quats[i, j, :] = quat.squeeze()
+                qsi.append(q)
+            qs.append(qsi)
+        quat_rotated = quat_rotate(points, quats).squeeze()
+        q_rotated = torch.zeros(b, p, n, 3)
+        for i in range(b):
+            for j in range(p):
+                for k in range(n):
+                    q_rotated[i, j, k] = torch.Tensor(qs[i][j].rotate(points[i, j, k].numpy()))
+        assert (quat_rotated - q_rotated).abs().mean() < 1e-6, 'Rotation is incorrect (2)'
 
     test_quat_conjugate()
     test_hamilton_product()
