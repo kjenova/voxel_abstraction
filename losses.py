@@ -31,7 +31,7 @@ def _consistency(volume, P, sampler, closest_points_grid):
 
     weights = sampler.get_importance_weights(P.dims)
     weights *= P.exist.unsqueeze(-1)
-    weights /= weights.sum(-1, keepdim = True) + 1e-7
+    weights /= weights.sum((1, 2), keepdim = True) + 1e-7
 
     i = point_indices(primitive_points, volume)
     closest_points = closest_points_grid.reshape(-1, 3)[i]
@@ -44,7 +44,7 @@ def _consistency(volume, P, sampler, closest_points_grid):
 
 def consistency(volume, P, sampler, closest_points_grid):
     distance, weights = _consistency(volume, P, sampler, closest_points_grid)
-    return (distance * weights).sum(-1).mean(1)
+    return (distance * weights).sum((1, 2))
 
 def loss(volume, primitives, sampled_points, closest_points_grid, sampler):
     cov = coverage(primitives, sampled_points)
