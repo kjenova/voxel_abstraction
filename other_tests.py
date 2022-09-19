@@ -34,7 +34,7 @@ def test_closest_points():
                     z = index_to_coordinate(k, n)
                     u = np.asarray([x, y, z])
 
-                    d1 = (shape.closest_points - u).pow(2).sum(-1)
+                    d1 = (shape.closest_points - u).pow(2).sum(-1).min()
                     d2 = (shape.closest_points[i, j, k] - u).pow(2).sum(-1)
                     assert np.allclose(d1, d2), 'closest_points incorrect'
 
