@@ -12,4 +12,4 @@ for i, shape in enumerate(dataset):
 
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(shape.shape_points)
-    o3d.io.write_point_cloud(f"{i + 1}.ply", pcd)
+    o3d.io.write_point_cloud(f"results/{i + 1}.ply", pcd)
