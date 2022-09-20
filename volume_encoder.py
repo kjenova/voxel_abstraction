@@ -10,10 +10,10 @@ class VolumeEncoder(nn.Module):
         c_out = first_layer_n_out_channels
 
         for _ in range(n_layers):
-            encoder.append(nn.Conv3d(c_in, c_out, kernel_size = 3, dilation = 1, bias = False))
+            encoder.append(nn.Conv3d(c_in, c_out, kernel_size = 3, padding = 'same', bias = False))
             encoder.append(nn.BatchNorm3d(c_out))
             encoder.append(nn.LeakyReLU(0.2, inplace = True))
-            encoder.append(nn.MaxPool3d(kernel_size = 2, dilation = 2))
+            encoder.append(nn.MaxPool3d(kernel_size = 2))
 
             c_in = c_out
             c_out *= 2

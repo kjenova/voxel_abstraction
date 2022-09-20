@@ -78,29 +78,8 @@ class Network(nn.Module):
     def __init__(self, params):
         super().__init__()
 
-        # Število aktivacij iz prvega konvolucijskega sloja je 4.
-        # Tretji (končni) konvolucijski sloj ima torej 4 * 2^{3 - 1} = 16
-        # aktivacij. Tako je tudi v referenčni implementaciji v Python-u:
-        # https://github.com/nileshkulkarni/volumetricPrimitivesPytorch/blob/367d2bc3f7d2ec122c4e2066c2ee2a922cf4e0c8/experiments/cadAutoEncCuboids/primSelTsdfChamfer.py#L172.
-        # Vendar v originalni implementaciji v Lua je končno število
-        # aktivacij 64. Tam je namreč 5 konvolucijskih slojev (tako kot v članku), ampak
-        # ugibam, da se zadnja dva izrodita v polno povezani sloj:
-        # https://github.com/shubhtuls/volumetricPrimitives/blob/3d994709925166d55aca32f1b6f448978836a05d/experiments/cadAutoEncCuboids/primSelTsdfChamfer.lua#L126
-        # Pytorch tega ne dovoli, stari torch pa je izgleda dovolil
-        # (drugačne privzete nastavitve za padding?). Dimenzije vhodnega
-        # volumna (32^3) in arhitektura (po vsakem sloju se velikost po
-        # vsaki dimenziji prepolovi z max pool slojem) sta namreč isti.
-        self.encoder = VolumeEncoder(3, 4, 1)
-        n = self.encoder.n_out_channels  # 16
-
-        # Ker se mi zdi 16 aktivacij res premalo, dodam še dva nivoja,
-        # ki sta funkcionalno enaka kot tista dva izrojena nivoja v Lua implementaciji:
-        layers = []
-        for _ in range(2):
-            layers.append(nn.Linear(n, 2 * n))
-            n *= 2
-            layers.append(nn.BatchNorm1d(n))
-            layers.append(nn.LeakyReLU(0.2, inplace = True))
+        self.encoder = VolumeEncoder(5, 4, 1)
+        n = self.encoder.n_out_channels
 
         # To so pa predvideni polno povezani sloji:
         for _ in range(2):
