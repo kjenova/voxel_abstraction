@@ -128,8 +128,8 @@ class BatchProvider:
 
         [b, n] = self.loaded_shape_points.size()[:2]
         i = torch.randint(0, n, (b, n_samples_per_shape), device = device)
-        i += n_samples_per_shape * torch.arange(0, batch_size, device = device).reshape(-1, 1)
-        sampled_points = self.loaded_shape_points.reshape(-1, 3)[i].to(device)
+        i += n * torch.arange(0, b, device = device).reshape(-1, 1)
+        sampled_points = self.loaded_shape_points.reshape(-1, 3)[i]
         return (self.loaded_volume, sampled_points, self.loaded_closest_points)
 
     def get_batches_for_visualization(self):
@@ -258,23 +258,24 @@ def train(network, batch_provider, params, stats):
 
             network.train()
 
-if shapenet_dir is None:
-    train_set = load_shapes(grid_size, n_examples, n_points_per_shape)
-else:
-    train_set = load_shapenet(shapenet_dir)
+if __name__ == "main":
+    if shapenet_dir is None:
+        train_set = load_shapes(grid_size, n_examples, n_points_per_shape)
+    else:
+        train_set = load_shapenet(shapenet_dir)
 
-batch_provider = BatchProvider(train_set)
-stats = Stats()
+    batch_provider = BatchProvider(train_set)
+    stats = Stats()
 
-# Za zdaj bomo vizualizirali kar primere iz učne množice. Tako je tudi v
-# referenčni implementaciji.
-for i, shape in enumerate(train_set[:n_examples_for_visualization]):
-    write_volume_mesh(shape, i + 1)
+    # Za zdaj bomo vizualizirali kar primere iz učne množice. Tako je tudi v
+    # referenčni implementaciji.
+    for i, shape in enumerate(train_set[:n_examples_for_visualization]):
+        write_volume_mesh(shape, i + 1)
 
-network = Network(PhaseParams(0))
-network.to(device)
+    network = Network(PhaseParams(0))
+    network.to(device)
 
-for phase in range(2):
-    train(network, batch_provider, PhaseParams(phase), stats)
+    for phase in range(2):
+        train(network, batch_provider, PhaseParams(phase), stats)
 
-stats.save_plots()
+    stats.save_plots()
