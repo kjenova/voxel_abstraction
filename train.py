@@ -36,6 +36,8 @@ n_examples_for_visualization = 5
 batch_size = 32
 use_batch_normalization_conv = True
 use_batch_normalization_linear = True
+# Ali napovedujemo prisotnost primitivov (True) ali pa kar vedno vzamemo vse (False):
+prune_primitives = True
 n_primitives = 20
 grid_size = 32
 # Iz vsake oblike smo med predprocesiranjem vzorčili 10.000 točk:
@@ -75,6 +77,7 @@ class PhaseParams:
         self.dims_factor = dims_factors[phase]
         self.prob_factor = prob_factors[phase]
         self.existence_penalty = existence_penalties[phase]
+        self.prune_primitives = prune_primitives
 
 class Network(nn.Module):
     def __init__(self, params):
@@ -207,20 +210,25 @@ def train(network, batch_provider, params, stats):
         cov, cons = loss(volume, P, sampled_points, closest_points, sampler)
         l = cov + cons
 
-        # Pri nas se minimizira 'penalty', čeprav se pri REINFORCE tipično maksimizira 'reward'.
-        # Edina razlika je v tem, da bi v primeru, da bi maksimizirali 'reward = - penalty', morali
-        # potem še pri gradientu dodati minus.
         total_penalty = .0
-        for p in range(n_primitives):
-            # Glede na članek bi bila sledeča formula, ampak če bi sledili referenčni implementaciji
-            # bi pa bilo 'l + params.existence_penalty * torch.sum(P.exist[:, p])':
-            # https://github.com/nileshkulkarni/volumetricPrimitivesPytorch/blob/367d2bc3f7d2ec122c4e2066c2ee2a922cf4e0c8/experiments/cadAutoEncCuboids/primSelTsdfChamfer.py#L142
-            penalty = l + params.existence_penalty * P.exist[:, p]
-            total_penalty += penalty.mean().item()
-            P.log_prob[:, p] *= reinforce_updater.update(penalty)
 
-        # Ker je navaden loss reduciran z .mean(), tudi ta "REINFORCE loss" reduciram z .mean():
-        (l.mean() + P.log_prob.mean()).backward()
+        if prune_primitives:
+            # Pri nas se minimizira 'penalty', čeprav se pri REINFORCE tipično maksimizira 'reward'.
+            # Edina razlika je v tem, da bi v primeru, da bi maksimizirali 'reward = - penalty', morali
+            # potem še pri gradientu dodati minus.
+            for p in range(n_primitives):
+                # Glede na članek bi bila sledeča formula, ampak če bi sledili referenčni implementaciji
+                # bi pa bilo 'l + params.existence_penalty * torch.sum(P.exist[:, p])':
+                # https://github.com/nileshkulkarni/volumetricPrimitivesPytorch/blob/367d2bc3f7d2ec122c4e2066c2ee2a922cf4e0c8/experiments/cadAutoEncCuboids/primSelTsdfChamfer.py#L142
+                penalty = l + params.existence_penalty * P.exist[:, p]
+                total_penalty += penalty.mean().item()
+                P.log_prob[:, p] *= reinforce_updater.update(penalty)
+
+            # Ker je navaden loss reduciran z .mean(), tudi ta "REINFORCE loss" reduciram z .mean():
+            (l.mean() + P.log_prob.mean()).backward()
+        else:
+            l.mean().backward()
+
         optimizer.step()
 
         i = batch_provider.iteration - 1

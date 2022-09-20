@@ -43,6 +43,7 @@ class PrimitivesPrediction(nn.Module):
     def __init__(self, n_input_channels, n_primitives, params):
         super().__init__()
 
+        self.prune_primitives = params.prune_primitives
         self.n_primitives = n_primitives
 
         dims_bias = torch.Tensor([-3] * 3) / params.dims_factor
@@ -70,9 +71,14 @@ class PrimitivesPrediction(nn.Module):
         # sistema, niso smiselne.
         trans = self.trans(feature) * .5
 
-        prob = self.prob(feature, params.prob_factor).squeeze()
-        distr = Bernoulli(prob)
-        exist = distr.sample()
-        log_prob = distr.log_prob(exist)
+        if self.prune_primitives:
+            prob = self.prob(feature, params.prob_factor).squeeze()
+            distr = Bernoulli(prob)
+            exist = distr.sample()
+            log_prob = distr.log_prob(exist)
+        else:
+            prob = torch.ones(feature.size(0), self.n_primitives)
+            exist = prob
+            log_prob = None
 
         return Primitives(dims, quat, trans, exist, prob, log_prob)
