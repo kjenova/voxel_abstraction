@@ -6,4 +6,5 @@ def weights_init(m):
     elif 'Linear' not in t:
         return
     m.weight.data.normal_(mean = mean, std = 0.02)
-    m.bias.data.zero_()
+    if m.bias is not None:
+        m.bias.data.zero_()

@@ -77,7 +77,7 @@ class PrimitivesPrediction(nn.Module):
             exist = distr.sample()
             log_prob = distr.log_prob(exist)
         else:
-            prob = torch.ones(feature.size(0), self.n_primitives)
+            prob = torch.ones(feature.size(0), self.n_primitives, device = feature.device)
             exist = prob
             log_prob = None
 
