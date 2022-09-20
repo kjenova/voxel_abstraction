@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 class VolumeEncoder(nn.Module):
-    def __init__(self, n_layers, first_layer_n_out_channels, n_input_channels):
+    def __init__(self, n_layers, first_layer_n_out_channels, n_input_channels, use_batch_normalization):
         super().__init__()
 
         encoder = []
@@ -10,8 +10,9 @@ class VolumeEncoder(nn.Module):
         c_out = first_layer_n_out_channels
 
         for _ in range(n_layers):
-            encoder.append(nn.Conv3d(c_in, c_out, kernel_size = 3, padding = 'same', bias = False))
-            encoder.append(nn.BatchNorm3d(c_out))
+            encoder.append(nn.Conv3d(c_in, c_out, kernel_size = 3, padding = 'same', bias = not use_batch_normalization))
+            if use_batch_normalization:
+                encoder.append(nn.BatchNorm3d(c_out))
             encoder.append(nn.LeakyReLU(0.2, inplace = True))
             encoder.append(nn.MaxPool3d(kernel_size = 2))
 

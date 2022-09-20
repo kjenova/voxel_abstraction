@@ -34,6 +34,8 @@ output_iteration = 1000
 # za toliko učnih primerov:
 n_examples_for_visualization = 5
 batch_size = 32
+use_batch_normalization_conv = True
+use_batch_normalization_linear = True
 n_primitives = 20
 grid_size = 32
 # Iz vsake oblike smo med predprocesiranjem vzorčili 10.000 točk:
@@ -78,21 +80,20 @@ class Network(nn.Module):
     def __init__(self, params):
         super().__init__()
 
-        self.encoder = VolumeEncoder(5, 4, 1)
+        self.encoder = VolumeEncoder(5, 4, 1, use_batch_normalization_conv)
         n = self.encoder.n_out_channels
 
         # To so pa predvideni polno povezani sloji:
         for _ in range(2):
-            linear = nn.Linear(n, n)
-            batch_norm = nn.BatchNorm1d(n)
-
-            # Prejšnjim slojem, ki v originalni implementaciji sodijo v konvolucijski del,
-            # pa pustimo, da se inicializirajo na privzeti način.
+            linear = nn.Linear(n, n, bias = not use_batch_normalization_linear)
             weights_init(linear)
-            weights_init(batch_norm)
-
             layers.append(linear)
-            layers.append(batch_norm)
+
+            if use_batch_normalization_linear:
+                batch_norm = nn.BatchNorm1d(n)
+                weights_init(batch_norm)
+                layers.append(batch_norm)
+
             layers.append(nn.LeakyReLU(0.2, inplace = True))
 
         self.fc_layers = nn.Sequential(*layers)
