@@ -16,7 +16,7 @@ from write_mesh import write_volume_mesh, write_predictions_mesh
 
 random.seed(0x5EED)
 
-shapenet_dir = 'shapenet/chamferData/03001627' # None = mitohondriji
+shapenet_dir = 'shapenet/chamferData/00'
 # Koliko povezanih komponent vzamemo pri celičnih predelkih
 # (pri ShapeNet-u vzamemo vse učne primere):
 n_examples = 2000
@@ -27,12 +27,12 @@ n_iterations = [20000, 30000]
 # (Bolj strogo gledano se na toliko iteracij ponovi batch z istimi modeli,
 # ker potem še za vsako iteracijo vzorčimo podmnožico točk na površini oblike.)
 repeat_batch_n_iterations = 2
-# Na vsake toliko iteracij se shrani napovedane primitive:
-save_mesh_iteration = 10000
 # Na vsake toliko iteracij se izpiše statistika:
 output_iteration = 1000
+# Na vsake toliko iteracij se shrani napovedane primitive
+save_mesh_iteration = 10000
 # za toliko učnih primerov:
-n_examples_for_visualization = 5
+n_examples_for_visualization = 100
 batch_size = 32
 use_batch_normalization_conv = True
 use_batch_normalization_linear = True
