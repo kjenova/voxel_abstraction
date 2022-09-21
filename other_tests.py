@@ -6,19 +6,26 @@ from load_shapes import closest_points_grid
 from train import BatchProvider
 from load_shapes import VolumeFaces
 
-shapenet_dir = 'shapenet/chamferData/03001627'
-n_examples = 40
+shapenet_dir = 'shapenet/chamferData/00'
+n_examples = 5
 dataset = load_shapenet(shapenet_dir)[:n_examples]
+
+def to_xzy(m):
+    t = str(type(m))
+    m_xzy = m.copy() if 'numpy.ndarray' in t else m.clone()
+    m_xzy[..., 1] = m[..., 2]
+    m_xzy[..., 2] = m[..., 1]
+    return m_xzy
 
 def write_shape(shape, name):
     write_volume_mesh(shape, name)
 
     pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(shape.shape_points)
+    pcd.points = o3d.utility.Vector3dVector(to_xzy(shape.shape_points))
     o3d.io.write_point_cloud(f"results/{name}_shape_points.ply", pcd)
 
     pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(shape.closest_points.reshape(-1, 3))
+    pcd.points = o3d.utility.Vector3dVector(to_xzy(shape.closest_points.reshape(-1, 3)))
     o3d.io.write_point_cloud(f"results/{name}_closest_points.ply", pcd)
 
 def plot():
@@ -53,7 +60,6 @@ class Shape:
         self.resized_volume_faces = VolumeFaces(volume)
 
 def test_batches():
-
     batch_provider = BatchProvider(dataset)
     (volume, sampled_points, closest_points) = batch_provider.get()
     volume = volume.cpu().numpy()
@@ -64,4 +70,4 @@ def test_batches():
         shape = Shape(volume[i], sampled_points[i], closest_points[i])
         write_shape(shape, f'b{i + 1}')
 
-test_batches()
+plot()
