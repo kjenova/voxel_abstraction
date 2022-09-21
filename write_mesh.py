@@ -3,7 +3,11 @@ import trimesh
 from trimesh import Trimesh
 
 def write_helper(vertices, faces, filename):
-    triangles = Trimesh(vertices, faces)
+    # xyz => xzy
+    vertices_xzy = vertices.copy()
+    vertices_xzy[..., 1] = vertices[..., 2]
+    vertices_xzy[..., 2] = vertices[..., 1]
+    triangles = Trimesh(vertices_xzy, faces)
     triangles.export(f'results/{filename}.stl')
 
 def write_volume_mesh(shape, name):
@@ -49,7 +53,7 @@ def write_predictions_mesh(vertices, name):
 
         for j in range(8):
             v = vertices[i, j]
-            # 0, 2, 1 je pravilno
+            # 0, 2, 1 je pravilno, saj pretvorimo xyz => xzy
             mtl_lines.append(f'v {v[0]} {v[2]} {v[1]}\n')
 
         for j in range(6):

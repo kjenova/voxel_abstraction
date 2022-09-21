@@ -37,7 +37,7 @@ batch_size = 32
 use_batch_normalization_conv = True
 use_batch_normalization_linear = True
 # Ali napovedujemo prisotnost primitivov (True) ali pa kar vedno vzamemo vse (False):
-prune_primitives = False
+prune_primitives = True
 n_primitives = 20
 grid_size = 32
 # Iz vsake oblike smo med predprocesiranjem vzorčili 10.000 točk:
