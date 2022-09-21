@@ -53,8 +53,7 @@ def write_predictions_mesh(vertices, name):
 
         for j in range(8):
             v = vertices[i, j]
-            # 0, 2, 1 je pravilno, saj pretvorimo xyz => xzy
-            mtl_lines.append(f'v {v[0]} {v[2]} {v[1]}\n')
+            mtl_lines.append(f'v {v[0]} {v[1]} {v[2]}\n')
 
         for j in range(6):
             f = cuboid_faces[j] + 8 * i + 1
