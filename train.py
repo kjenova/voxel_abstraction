@@ -30,7 +30,7 @@ repeat_batch_n_iterations = 2
 # Na vsake toliko iteracij se izpiše statistika:
 output_iteration = 1000
 # Na vsake toliko iteracij se shrani napovedane primitive
-save_mesh_iteration = 10000
+save_mesh_iteration = sum(n_iterations) # samo na koncu
 # za toliko učnih primerov:
 n_examples_for_visualization = 100
 batch_size = 32
