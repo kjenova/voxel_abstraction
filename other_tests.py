@@ -7,8 +7,8 @@ from train import BatchProvider
 from load_shapes import VolumeFaces
 
 shapenet_dir = 'shapenet/chamferData/00'
-n_examples = 5
-dataset = load_shapenet(shapenet_dir)[:n_examples]
+max_n_examples = 5
+dataset = load_shapenet(shapenet_dir, max_n_examples)
 
 def to_xzy(m):
     t = str(type(m))

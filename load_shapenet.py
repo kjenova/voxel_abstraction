@@ -12,9 +12,12 @@ class ShapeNetShape:
         self.shape_points = mat['surfaceSamples']
         self.closest_points = torch.from_numpy(mat['closestPoints'])
 
-def load_shapenet(directory):
+def load_shapenet(directory, max_n_shapes = 1000000):
     shapes = []
     for filename in glob.iglob(f'{directory}/*.mat'):
         mat = loadmat(filename)
         shapes.append(ShapeNetShape(mat))
+
+        if len(shapes) >= max_n_shapes:
+            break
     return shapes
