@@ -5,7 +5,7 @@ import pyvista as pv
 from load_shapenet import load_shapenet, ShapeNetShape
 
 shapenet_dir = 'shapenet/chamferData/00'
-max_n_examples = 2
+max_n_examples = 100
 dataset = load_shapenet(shapenet_dir, max_n_examples)
 
 n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
@@ -59,14 +59,15 @@ for i, shape in enumerate(dataset):
             camera.focal_point = - position
             camera.up = up_vector_on_sphere(position)
 
-            p.add_mesh(mesh, color = True)
+            mesh_actor = p.add_mesh(mesh, color = True)
             p.store_image = True
             p.camera = camera
 
             image = p.screenshot(transparent_background = True)
             image = Image.fromarray(image, 'RGBA')
             depth = p.get_image_depth()
-            p.clear()
+
+            p.remove_actor(mesh_actor)
 
             n_empty_pixels = np.count_nonzero(~np.isnan(depth))
             if n_empty_pixels < min_n_empty_pixels:
