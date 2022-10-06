@@ -63,3 +63,18 @@ for i, shape in enumerate(dataset):
 embedding = np.random.rand(n, 2)
 embedding = embedding - embedding.min(0)
 embedding = embedding / embedding.max(0)
+s = plot_image_size - shape_image_size
+embedding *= s
+embedding = embedding.floor().clip(0, s - 1).astype(np.int)
+
+plot = Image.new('RGBA', (plot_image_size, plot_image_size), (220, 220, 220, 0))
+
+for i in range(n):
+    left = embedding[i, 0]
+    upper = embedding[i, 1] + shape_image_size
+    right = left + shape_image_size
+    lower = embedding[i, 0]
+
+    plot.paste(images[i], box = (left, upper, right, lower), mask = images[i]))
+
+plot.save(f'plot.png')
