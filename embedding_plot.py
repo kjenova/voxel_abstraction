@@ -2,11 +2,15 @@ import numpy as np
 from trimesh import Trimesh
 from PIL import Image
 import pyvista as pv
+from sklearn.manifold import TSNE
 from load_shapenet import load_shapenet, ShapeNetShape
 
-shapenet_dir = 'shapenet/chamferData/00'
 max_n_examples = 100
-dataset = load_shapenet(shapenet_dir, max_n_examples)
+shape_parameters = np.load('shape_parameters.npy')[:max_n_examples]
+n = np.shape[0]
+
+shapenet_dir = 'shapenet/chamferData/00'
+dataset = load_shapenet(shapenet_dir, n)
 
 n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
 camera_radius = 4.
@@ -77,8 +81,7 @@ for i, shape in enumerate(dataset):
     images.append(best_image)
     best_image.save(f'render/best_{i + 1}.png')
 
-n = len(dataset)
-embedding = np.random.rand(n, 2)
+embedding = TSNE(n_components = 2).fit_transform(shape_parameters)
 embedding = embedding - embedding.min(0)
 embedding = embedding / embedding.max(0)
 s = plot_image_size - shape_image_size

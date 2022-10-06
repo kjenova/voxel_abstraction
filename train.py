@@ -252,17 +252,26 @@ def train(network, batch_provider, params, stats):
         if batch_provider.iteration % save_mesh_iteration == 0:
             network.eval()
             with torch.no_grad():
-                k = 1
+                parameters = np.zeros(n_examples, n_primitives, 7)
+
+                k = 0
                 for volume_batch in batch_provider.get_batches_for_visualization():
                     X = network(volume_batch, params)
                     vertices = predictions_to_mesh(X).cpu()
+                    nv = vertices.size(0)
 
-                    for j in range(vertices.size(0)):
+                    parameters[k : k + nv, :, :3] = X.dims
+                    parameters[k : k + nv, :, 3:7] = X.quat
+                    parameters[k : k + nv, :, 7:] = X.trans
+
+                    for j in range(nv):
                         # Pri inferenci vzamemo samo kvadre z verjetnostjo prisotnosti > 0.5:
                         v = vertices[j, X.prob[j].cpu() > 0.5].numpy()
-                        write_predictions_mesh(v, f'i{i}_{k + j}')
+                        write_predictions_mesh(v, f'i{i}_{k + j + 1}')
 
-                    k += vertices.size(0)
+                    k += nv
+
+                np.save('shape_parameters.npy', parameters)
 
             network.train()
 
