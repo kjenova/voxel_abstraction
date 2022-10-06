@@ -16,6 +16,21 @@ clipping_range = (camera_radius - max_shape_radius, camera_radius + 2 * max_shap
 shape_image_size = 256
 plot_image_size = 4096
 
+def to_cartesian(elevation, azimuth):
+    return np.asarray([
+            np.sin(azimuth) * np.cos(elevation),
+            np.sin(azimuth) * np.sin(elevation),
+            np.cos(azimuth)
+        ])
+
+def up_vector_on_sphere(v):
+    i = np.abs(v).argmax()
+    j = (i + 1) % 3
+    k = (i + 2) % 3
+    up = np.ones(3)
+    up[i] = (v[j] + v[k]) / - v[i]
+    return up / np.linalg.norm(up)
+
 images = []
 
 for i, shape in enumerate(dataset):
@@ -75,6 +90,6 @@ for i in range(n):
     right = left + shape_image_size
     lower = embedding[i, 0]
 
-    plot.paste(images[i], box = (left, upper, right, lower), mask = images[i]))
+    plot.paste(images[i], box = (left, upper, right, lower), mask = images[i])
 
 plot.save(f'plot.png')
