@@ -5,7 +5,7 @@ import pyvista as pv
 from load_shapenet import load_shapenet, ShapeNetShape
 
 shapenet_dir = 'shapenet/chamferData/00'
-max_n_examples = 5
+max_n_examples = 2
 dataset = load_shapenet(shapenet_dir, max_n_examples)
 
 n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
@@ -32,6 +32,7 @@ def up_vector_on_sphere(v):
     return up / np.linalg.norm(up)
 
 images = []
+p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 
 for i, shape in enumerate(dataset):
     vertices, faces = shape.resized_volume_faces.get_mesh()
@@ -58,7 +59,6 @@ for i, shape in enumerate(dataset):
             camera.focal_point = - position
             camera.up = up_vector_on_sphere(position)
 
-            p = pv.Plotter(off_screen = True, window_size = [1024, 1024])
             p.add_mesh(mesh, color = True)
             p.store_image = True
             p.camera = camera
@@ -66,30 +66,27 @@ for i, shape in enumerate(dataset):
             image = p.screenshot(transparent_background = True)
             image = Image.fromarray(image, 'RGBA')
             depth = p.get_image_depth()
-            n_empty_pixels = np.count_nonzero(~np.isnan(depth))
+            p.clear()
 
+            n_empty_pixels = np.count_nonzero(~np.isnan(depth))
             if n_empty_pixels < min_n_empty_pixels:
                 min_n_empty_pixels = n_empty_pixels
                 best_image = image
 
-    image.save(f'render/best_{i + 1}.png')
-    images.append(image)
+    images.append(best_image)
+    best_image.save(f'render/best_{i + 1}.png')
 
+n = len(dataset)
 embedding = np.random.rand(n, 2)
 embedding = embedding - embedding.min(0)
 embedding = embedding / embedding.max(0)
 s = plot_image_size - shape_image_size
 embedding *= s
-embedding = embedding.floor().clip(0, s - 1).astype(np.int)
+embedding = np.floor(embedding).clip(0, s - 1).astype(int)
 
-plot = Image.new('RGBA', (plot_image_size, plot_image_size), (220, 220, 220, 0))
+plot = Image.new('RGBA', (plot_image_size,) * 2, (0, 0, 0, 0))
 
 for i in range(n):
-    left = embedding[i, 0]
-    upper = embedding[i, 1] + shape_image_size
-    right = left + shape_image_size
-    lower = embedding[i, 0]
+    plot.paste(images[i], box = (embedding[i, 0], embedding[i, 1]), mask = images[i])
 
-    plot.paste(images[i], box = (left, upper, right, lower), mask = images[i])
-
-plot.save(f'plot.png')
+plot.save('plot.png')
