@@ -1,57 +1,65 @@
-import torch
 import numpy as np
-from scipy.spatial.transform import Rotation
 from trimesh import Trimesh
 from PIL import Image
 import pyvista as pv
 from load_shapenet import load_shapenet, ShapeNetShape
-from quat_utils import quat_rotate
 
 shapenet_dir = 'shapenet/chamferData/00'
-max_n_examples = 1
+max_n_examples = 5
 dataset = load_shapenet(shapenet_dir, max_n_examples)
 
-# Število vrednosti kota okoli vsake osi
-n_angles = 4
-n_rotations = n_angles ** 3
-angles = torch.arange(0, n_angles) * (2 * np.pi / n_angles)
-euler_angles = torch.cartesian_prod(angles, angles, angles)
-quaternions = Rotation.from_euler('xyz', euler_angles).as_quat()
-quaternions = torch.Tensor(quaternions).unsqueeze(0)
+n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
+camera_radius = 4.
+max_shape_radius = np.sqrt(3) / 2 + 1e-4
+clipping_range = (camera_radius - max_shape_radius, camera_radius + 2 * max_shape_radius)
+
+shape_image_size = 256
+plot_image_size = 4096
+
+images = []
 
 for i, shape in enumerate(dataset):
-    v, faces = shape.resized_volume_faces.get_mesh()
-
-    with torch.no_grad():
-        vertices = torch.Tensor(v).reshape(1, 1, -1, 3)
-        vertices = vertices.repeat(1, n_rotations, 1, 1)
-        vertices = quat_rotate(vertices, quaternions)
-        vertices = vertices.squeeze(0).numpy()
+    vertices, faces = shape.resized_volume_faces.get_mesh()
+    mesh = pv.wrap(Trimesh(vertices, faces))
 
     # To je slika i-te oblike, ki je tako zarotirana,
     # da je slika čimbolj zapolnjena.
     best_image = None
     min_n_empty_pixels = float('inf')
 
-    for r in range(n_rotations):
-        mesh = pv.wrap(Trimesh(vertices[r], faces))
-        p = pv.Plotter(off_screen = True, window_size = [1024, 1024])
-        p.add_mesh(mesh, color = True)
-        p.store_image = True
+    for e in range(n_angles):
+        for a in range(n_angles):
+            elevation = e * np.pi / n_angles # [0, pi)
+            azimuth = a * 2 * np.pi / n_angles # [0, 2pi)
 
-        image = p.screenshot()
-        depth = p.get_image_depth()
-        n_empty_pixels = np.count_nonzero(~np.isnan(depth))
+            camera = pv.Camera()
+            camera.roll = 0
+            camera.elevation = 0
+            camera.azimuth = 0
+            camera.clipping_range = clipping_range
 
-        if n_empty_pixels < min_n_empty_pixels:
-            min_n_empty_pixels = n_empty_pixels
-            best_image = image
+            position = camera_radius * to_cartesian(elevation, azimuth)
+            camera.position = position
+            camera.focal_point = - position
+            camera.up = up_vector_on_sphere(position)
 
-    img = Image.fromarray(image, 'RGB')
-    img.save(f'render/{i + 1}.png')
+            p = pv.Plotter(off_screen = True, window_size = [1024, 1024])
+            p.add_mesh(mesh, color = True)
+            p.store_image = True
+            p.camera = camera
 
-if False:
-    # Za zdaj random
-    embedding = np.random.rand(n, 2)
-    embedding = embedding - embedding.min(0)
-    embedding = embedding / embedding.max(0)
+            image = p.screenshot(transparent_background = True)
+            image = Image.fromarray(image, 'RGBA')
+            depth = p.get_image_depth()
+            n_empty_pixels = np.count_nonzero(~np.isnan(depth))
+
+            if n_empty_pixels < min_n_empty_pixels:
+                min_n_empty_pixels = n_empty_pixels
+                best_image = image
+
+    image.save(f'render/best_{i + 1}.png')
+    images.append(image)
+
+embedding = np.random.rand(n, 2)
+embedding = embedding - embedding.min(0)
+embedding = embedding / embedding.max(0)
