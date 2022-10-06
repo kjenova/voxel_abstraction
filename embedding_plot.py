@@ -5,9 +5,9 @@ import pyvista as pv
 from sklearn.manifold import TSNE
 from load_shapenet import load_shapenet, ShapeNetShape
 
-max_n_examples = 100
+max_n_examples = 500
 shape_parameters = np.load('shape_parameters.npy')[:max_n_examples]
-n = np.shape[0]
+n = shape_parameters.shape[0]
 
 shapenet_dir = 'shapenet/chamferData/00'
 dataset = load_shapenet(shapenet_dir, n)
@@ -18,7 +18,7 @@ max_shape_radius = np.sqrt(3) / 2 + 1e-4
 clipping_range = (camera_radius - max_shape_radius, camera_radius + 2 * max_shape_radius)
 
 shape_image_size = 256
-plot_image_size = 4096
+plot_image_size = 16384
 
 def to_cartesian(elevation, azimuth):
     return np.asarray([

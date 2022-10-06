@@ -32,7 +32,7 @@ output_iteration = 1000
 # Na vsake toliko iteracij se shrani napovedane primitive
 save_mesh_iteration = sum(n_iterations) # samo na koncu
 # za toliko učnih primerov:
-n_examples_for_visualization = 100
+n_examples_for_visualization = 500
 batch_size = 32
 use_batch_normalization_conv = True
 use_batch_normalization_linear = True
@@ -252,7 +252,7 @@ def train(network, batch_provider, params, stats):
         if batch_provider.iteration % save_mesh_iteration == 0:
             network.eval()
             with torch.no_grad():
-                parameters = np.zeros(n_examples, n_primitives, 7)
+                parameters = np.zeros((n_examples_for_visualization, n_primitives, 10))
 
                 k = 0
                 for volume_batch in batch_provider.get_batches_for_visualization():
@@ -260,9 +260,9 @@ def train(network, batch_provider, params, stats):
                     vertices = predictions_to_mesh(X).cpu()
                     nv = vertices.size(0)
 
-                    parameters[k : k + nv, :, :3] = X.dims
-                    parameters[k : k + nv, :, 3:7] = X.quat
-                    parameters[k : k + nv, :, 7:] = X.trans
+                    parameters[k : k + nv, :, :3] = X.dims.cpu().numpy()
+                    parameters[k : k + nv, :, 3:7] = X.quat.cpu().numpy()
+                    parameters[k : k + nv, :, 7:] = X.trans.cpu().numpy()
 
                     for j in range(nv):
                         # Pri inferenci vzamemo samo kvadre z verjetnostjo prisotnosti > 0.5:
@@ -271,7 +271,9 @@ def train(network, batch_provider, params, stats):
 
                     k += nv
 
+                parameters = parameters.reshape(n_examples_for_visualization, -1)
                 np.save('shape_parameters.npy', parameters)
+                return
 
             network.train()
 
