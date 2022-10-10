@@ -16,7 +16,7 @@ from write_mesh import write_volume_mesh, write_predictions_mesh
 
 random.seed(0x5EED)
 
-shapenet_dir = 'shapenet/chamferData/00'
+shapenet_dir = 'shapenet/chamferData/01'
 # Koliko povezanih komponent vzamemo pri celičnih predelkih
 # (pri ShapeNet-u vzamemo vse učne primere):
 n_examples = 2000
@@ -29,8 +29,8 @@ n_iterations = [20000, 30000]
 repeat_batch_n_iterations = 2
 # Na vsake toliko iteracij se izpiše statistika:
 output_iteration = 1000
-# Na vsake toliko iteracij se shrani napovedane primitive
-save_mesh_iteration = sum(n_iterations) # samo na koncu
+# Na vsake toliko iteracij se shrani napovedane primitive in model
+save_iteration = sum(n_iterations) # samo na koncu
 # za toliko učnih primerov:
 n_examples_for_visualization = 500
 batch_size = 32
@@ -249,7 +249,9 @@ def train(network, batch_provider, params, stats):
             print(f'    mean prob: {mean_prob}')
             print(f'    mean penalty: {mean_penalty}')
 
-        if batch_provider.iteration % save_mesh_iteration == 0:
+        if batch_provider.iteration % save_iteration == 0:
+            torch.save(network.state_dict(), 'save.torch')
+
             network.eval()
             with torch.no_grad():
                 parameters = np.zeros((n_examples_for_visualization, n_primitives, 10))

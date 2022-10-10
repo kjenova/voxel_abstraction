@@ -79,7 +79,6 @@ for i, shape in enumerate(dataset):
                 best_image = image
 
     images.append(best_image)
-    best_image.save(f'render/best_{i + 1}.png')
 
 embedding = TSNE(n_components = 2).fit_transform(shape_parameters)
 embedding = embedding - embedding.min(0)
