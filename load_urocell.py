@@ -8,7 +8,7 @@ test_data = [
     ('fib1-4-3-0.nii.gz', [[0], []])
 ]
 
-def load_validation_and_test():
+def load_validation_and_test(basedir):
     validation = []
     test = []
 
