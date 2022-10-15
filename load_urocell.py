@@ -1,5 +1,6 @@
 import nibabel
 from skimage import measure
+from load_shapes import resize_volume, VolumeFaces
 
 test_data = [
     ('fib1-1-0-3.nii.gz', [[0], [1, 2]]),
@@ -8,7 +9,13 @@ test_data = [
     ('fib1-4-3-0.nii.gz', [[0], []])
 ]
 
-def load_validation_and_test(basedir):
+class UroCellShape:
+    def __init__(self, volume, grid_size):
+        self.volume = volume
+        self.resized_volume = resize_volume(volume, grid_size)
+        self.volume_faces = VolumeFaces(volume)
+
+def load_validation_and_test(basedir, grid_size, discard_validation = False):
     validation = []
     test = []
 
@@ -23,9 +30,10 @@ def load_validation_and_test(basedir):
             props.sort(key = lambda x: x.area, reverse = True)
 
             for j, component in enumerate(p.filled_image for p in props):
+                shape = UroCellShape(component, grid_size)
                 if j in indices:
-                    test.append(component)
-                else:
-                    validation.append(component)
+                    test.append(shape)
+                else if not discard_validation:
+                    validation.append(shape)
 
     return validation, test

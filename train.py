@@ -279,6 +279,12 @@ def train(network, batch_provider, params, stats):
 
             network.train()
 
+def load_evaluation_model():
+    model = Network(PhaseParams(1))
+    model.load_state_dict(torch.load('save.torch'))
+    model.eval()
+    return model
+
 if __name__ == "__main__":
     if shapenet_dir is None:
         train_set = load_shapes(grid_size, n_examples, n_points_per_shape)

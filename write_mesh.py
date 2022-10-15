@@ -1,6 +1,7 @@
 import numpy as np
 import trimesh
 from trimesh import Trimesh
+from colors import colors
 
 def write_helper(vertices, faces, filename):
     # xyz => xzy
@@ -24,25 +25,22 @@ cuboid_faces = np.asarray([ \
     [4, 5, 7, 6] \
 ])
 
-colors = np.asarray([ \
-    [255, 0, 0], # rdeča \
-    [0, 255, 255], # zelena \
-    [0, 0, 255], # modra \
-    [255, 165, 0], # oranžna \
-    [255, 255, 0], # rumena \
-    [150, 75, 0], # rjava \
-    [255, 105, 180], # roza \
-    [128, 128, 128], # siva \
-    [64, 224, 208], # turkizna \
-    [134, 1, 175] # vijolična \
-], dtype = np.uint8)
+def prediction_vertices_to_trimesh(vertices):
+    p = vertices.shape[0]
+    v = vertices.reshape(-1, 3)
+    f = cuboid_faces.reshape(1, 6, 4).repeat(p, dim = 0)
+    f += np.arange(p).reshape(p, 1, 1)
+    f = f.reshape(-1, 4)
+    c = colors[:p].reshape(p, 1, 3).repeat(6, dim = 1)
+    c = c.reshape(-1, 3)
+    return Trimesh(v, f, face_colors = c)
 
 def write_predictions_mesh(vertices, name):
     mtl_lines = []
     p = vertices.shape[0]
 
     for i in range(min(p, colors.shape[0])):
-        c = colors[i] / 255
+        c = colors[i]
         mtl_lines.append(f'newmtl m{i}\nKd {c[0]} {c[1]} {c[2]}\nKa 0 0 0\n')
 
     filename = f'{name}_predictions.mtl'
