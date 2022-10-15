@@ -3,7 +3,7 @@ import numpy as np
 from trimesh import Trimesh
 from PIL import Image
 import pyvista as pv
-from train import load_evaluation_model, ShapeParams
+from train import load_evaluation_model, PhaseParams
 from load_urocell import load_validation_and_test
 from generate_mesh import predictions_to_mesh
 from write_mesh import prediction_vertices_to_trimesh
@@ -18,9 +18,10 @@ remove_redundant = False # TODO
 basedir = '/home/klemenjan/UroCell/mito/branched'
 _, test = load_validation_and_test(basedir, grid_size, discard_validation = True)
 
-volume_batch = torch.stack([shape.volume for shape in test])
-P = network(volume_batch, ShapeParams(1))
-predictions_vertices = predictions_to_mesh(P).cpu()
+volume_batch = torch.stack([torch.Tensor(shape.resized_volume) for shape in test])
+with torch.no_grad():
+    P = model(volume_batch, PhaseParams(1))
+    predictions_vertices = predictions_to_mesh(P).cpu()
 
 n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
 shape_image_size = 512

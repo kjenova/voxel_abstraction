@@ -30,10 +30,9 @@ def load_validation_and_test(basedir, grid_size, discard_validation = False):
             props.sort(key = lambda x: x.area, reverse = True)
 
             for j, component in enumerate(p.filled_image for p in props):
-                shape = UroCellShape(component, grid_size)
                 if j in indices:
-                    test.append(shape)
-                else if not discard_validation:
-                    validation.append(shape)
+                    test.append(UroCellShape(component, grid_size))
+                elif not discard_validation:
+                    validation.append(UroCellShape(component, grid_size))
 
     return validation, test
