@@ -23,7 +23,11 @@ p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 for i, shape in enumerate(dataset):
     vertices, faces = shape.resized_volume_faces.get_mesh()
     mesh = pv.wrap(Trimesh(vertices, faces))
-    best_image = bruteforce_view(p, mesh, n_angles)
+
+    mesh_actor = p.add_mesh(mesh)
+    best_image = bruteforce_view(p, n_angles)
+    p.remove_actor(mesh_actor)
+
     images.append(best_image)
 
 embedding = TSNE(n_components = 2).fit_transform(shape_parameters)

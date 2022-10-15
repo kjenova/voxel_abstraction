@@ -9,7 +9,7 @@ from bruteforce_view import bruteforce_view
 basedir = '/home/klemenjan/UroCell/mito/branched'
 _, test = load_validation_and_test(basedir)
 
-n_angles = 16 # Število vrednosti elevation in azimuth kota kamere
+n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
 shape_image_size = 512
 plot_image_height = 2 * shape_image_size
 plot_image_width = 5 * shape_image_size
@@ -22,7 +22,11 @@ for component in test:
     volume_faces = VolumeFaces(component)
     vertices, faces = volume_faces.get_mesh()
     mesh = pv.wrap(Trimesh(vertices, faces))
-    best_image = bruteforce_view(p, mesh, n_angles, camera_radius = 2.)
+
+    mesh_actor = p.add_mesh(mesh)
+    best_image = bruteforce_view(p, n_angles)
+    p.remove_actor(mesh_actor)
+
     images.append(best_image)
 
 plot = Image.new('RGBA', (plot_image_width, plot_image_height), (0, 0, 0, 0))
