@@ -3,13 +3,14 @@ from trimesh import Trimesh
 from PIL import Image
 import pyvista as pv
 from load_shapes import VolumeFaces
-from load_urocell import load_shapenet, ShapeNetShape
+from load_urocell import load_validation_and_test
+from bruteforce_view import bruteforce_view
 
-basedir = 'C:/Users/Klemen/Downloads/UroCell-master/UroCell-master/mito/branched'
+basedir = '/home/klemenjan/UroCell/mito/branched'
 _, test = load_validation_and_test(basedir)
 
-n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
-shape_image_size = 256
+n_angles = 16 # Število vrednosti elevation in azimuth kota kamere
+shape_image_size = 512
 plot_image_height = 2 * shape_image_size
 plot_image_width = 5 * shape_image_size
 plot_image_size = [plot_image_width, plot_image_height]
@@ -21,10 +22,10 @@ for component in test:
     volume_faces = VolumeFaces(component)
     vertices, faces = volume_faces.get_mesh()
     mesh = pv.wrap(Trimesh(vertices, faces))
-    best_image = bruteforce_view(p, mesh, n_angles)
+    best_image = bruteforce_view(p, mesh, n_angles, camera_radius = 2.)
     images.append(best_image)
 
-plot = Image.new('RGBA', (plot_image_width, plot_image_height,) * 2, (0, 0, 0, 0))
+plot = Image.new('RGBA', (plot_image_width, plot_image_height), (0, 0, 0, 0))
 
 for i in range(2):
     for j in range(5):

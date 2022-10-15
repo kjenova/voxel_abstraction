@@ -17,13 +17,13 @@ def up_vector_on_sphere(v):
     up[i] = (v[j] + v[k]) / - v[i]
     return up / np.linalg.norm(up)
 
-camera_radius = 4.
 max_shape_radius = np.sqrt(3) / 2 + 1e-4
-clipping_range = (camera_radius - max_shape_radius, camera_radius + 2 * max_shape_radius)
 
 # To je slika oblike 'mesh', ki je tako zarotirana,
 # da je slika čimbolj zapolnjena.
-def bruteforce_view(p, mesh, n_angles):
+def bruteforce_view(p, mesh, n_angles, camera_radius = 4.):
+    clipping_range = (camera_radius - max_shape_radius, camera_radius + 2 * max_shape_radius)
+
     best_image = None
     min_n_empty_pixels = float('inf')
 
