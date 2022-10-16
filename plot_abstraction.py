@@ -39,27 +39,30 @@ def prediction_vertices_to_mesh(vertices):
     f = cuboid_faces.reshape(1, 6, 4).repeat(p, axis = 0)
     f += 8 * np.arange(p).reshape(p, 1, 1)
     f = f.reshape(-1, 4)
-    c = colors[:p].reshape(p, 1, 3).repeat(8, axis = 1)
+    f = np.concatenate((4 * np.ones((f.shape[0], 1), dtype = int), f), axis = 1)
+    c = colors[:p].reshape(p, 1, 3).repeat(6, axis = 1)
     c = c.reshape(-1, 3)
 
-    return pv.wrap(Trimesh(v, f)), c
+    mesh = pv.PolyData(v, faces = f.reshape(-1), n_faces = 6 * p)
+    mesh["colors"] = c
+    return mesh
 
 for i in range(10):
     vertices, faces = test[i].volume_faces.get_mesh()
     volume_mesh = pv.wrap(Trimesh(vertices, faces))
 
     v = predictions_vertices[i, P.prob[i].cpu() > prob_threshold].numpy()
-    predictions_mesh, vertex_colors = prediction_vertices_to_mesh(v)
+    predictions_mesh = prediction_vertices_to_mesh(v)
 
-    volume_actor = p.add_mesh(volume_mesh)
-    predictions_actor = p.add_mesh(predictions_mesh, scalars = vertex_colors, rgb = True)
+    volume_actor = p.add_mesh(volume_mesh, opacity = .5)
+    predictions_actor = p.add_mesh(predictions_mesh, scalars = "colors", rgb = True)
     best_image = bruteforce_view(p, n_angles)
     p.remove_actor(volume_actor)
     p.remove_actor(predictions_actor)
 
     images.append(best_image)
 
-plot = Image.new('RGBA', (plot_image_width, plot_image_height), (0, 0, 0, 0))
+plot = Image.new('RGB', (plot_image_width, plot_image_height), (0, 0, 0))
 
 for i in range(2):
     for j in range(5):

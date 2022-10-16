@@ -42,8 +42,8 @@ def bruteforce_view(p, n_angles, camera_radius = 2.5):
             p.set_viewup(up, reset = False)
             p.camera.clipping_range = clipping_range
 
-            image = p.screenshot(transparent_background = True)
-            image = Image.fromarray(image, 'RGBA')
+            image = p.screenshot() # transparent_background = True)
+            image = Image.fromarray(image, 'RGB')
             depth = p.get_image_depth()
 
             n_empty_pixels = np.isnan(depth).sum()
