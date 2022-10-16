@@ -11,12 +11,14 @@ from losses import loss
 from reinforce import ReinforceRewardUpdater
 from load_shapes import load_shapes, Shape
 from load_shapenet import load_shapenet, ShapeNetShape
+from load_urocell import load_validation_and_test
 from generate_mesh import predictions_to_mesh
 from write_mesh import write_volume_mesh, write_predictions_mesh
 
 random.seed(0x5EED)
 
 shapenet_dir = 'shapenet/chamferData/01'
+urocell_dir = '/home/klemenjan/UroCell/mito/branched'
 # Koliko povezanih komponent vzamemo pri celičnih predelkih
 # (pri ShapeNet-u vzamemo vse učne primere):
 n_examples = 2000
@@ -29,22 +31,22 @@ n_iterations = [20000, 30000]
 repeat_batch_n_iterations = 2
 # Na vsake toliko iteracij se izpiše statistika:
 output_iteration = 1000
-# Na vsake toliko iteracij se shrani napovedane primitive in model
-save_iteration = sum(n_iterations) # samo na koncu
-# za toliko učnih primerov:
-n_examples_for_visualization = 500
-batch_size = 32
-use_batch_normalization_conv = True
-use_batch_normalization_linear = True
+# Na vsake toliko iteracij se shrani model, če je validacijski loss manjši:
+save_iteration = 1000
+
 # Ali napovedujemo prisotnost primitivov (True) ali pa kar vedno vzamemo vse (False):
 prune_primitives = True
 n_primitives = 20
 grid_size = 32
 # Iz vsake oblike smo med predprocesiranjem vzorčili 10.000 točk:
 n_points_per_shape = 10000
-# Vendar naenkrat bomo upoštevali samo 1000 točk (na novo vzorčimo vsako epoho):
+# Vendar naenkrat bomo upoštevali samo 1000 naključnih točk:
 n_samples_per_shape = 1000
 n_samples_per_primitive = 150
+
+batch_size = 32
+use_batch_normalization_conv = True
+use_batch_normalization_linear = True
 learning_rate = 1e-3
 reinforce_baseline_momentum = .9
 
@@ -60,7 +62,7 @@ reinforce_baseline_momentum = .9
 dims_factors = [0.01, 0.5] # prva in druga faza
 
 # Ta faktor ima isto nalogo, ampak je za napovedovanje verjetnosti.
-# V prvi fazi učenja je faktor zelo majhen, saj poskusim optimizirati ostale
+# V prvi fazi učenja je faktor zelo majhen, saj poskusimo optimizirati ostale
 # parametre, preden dovolimo, da se nad kvadrom "obupa".
 prob_factors = [0.0001, 0.2]
 
@@ -108,50 +110,56 @@ class Network(nn.Module):
         x = self.fc_layers(x)
         return self.primitives(x, params)
 
+def sample_points(all_points):
+    [b, n] = all_points.size()[:2]
+    i = torch.randint(0, n, (b, n_samples_per_shape), device = device)
+    i += n * torch.arange(0, b, device = device).reshape(-1, 1)
+    return all_points.reshape(-1, 3)[i]
+
 class BatchProvider:
-    def __init__(self, shapes):
+    def __init__(self, shapes, test = False):
         self.volume = torch.stack([torch.from_numpy(s.resized_volume.astype(np.float32)) for s in shapes]).to(device)
-        self.shape_points = torch.stack([torch.from_numpy(s.shape_points) for s in shapes]).to(device)
-        self.closest_points = torch.stack([s.closest_points for s in shapes]).to(device)
+        self.n = self.volume.size(0)
 
-        self.iteration = 0
+        if not test:
+            self.shape_points = torch.stack([torch.from_numpy(s.shape_points) for s in shapes]).to(device)
+            self.closest_points = torch.stack([s.closest_points for s in shapes]).to(device)
+            self.iteration = 0
 
-    def load_examples(self):
-        n = self.volume.size(0)
-        indices = torch.randint(0, n, (min(batch_size, n),), device = device)
+    def load_batch(self):
+        indices = torch.randint(0, self.n, (min(batch_size, self.n),), device = device)
         self.loaded_volume = self.volume[indices]
         self.loaded_shape_points = self.shape_points[indices]
         self.loaded_closest_points = self.closest_points[indices]
 
     def get(self):
         if self.iteration % repeat_batch_n_iterations == 0:
-            self.load_examples()
+            self.load_batch()
 
         self.iteration += 1
 
-        [b, n] = self.loaded_shape_points.size()[:2]
-        i = torch.randint(0, n, (b, n_samples_per_shape), device = device)
-        i += n * torch.arange(0, b, device = device).reshape(-1, 1)
-        sampled_points = self.loaded_shape_points.reshape(-1, 3)[i]
+        sampled_points = sample_points(self.loaded_shape_points.reshape(-1, 3))
         return (self.loaded_volume, sampled_points, self.loaded_closest_points)
 
-    def get_batches_for_visualization(self):
-        batches = []
-        for i in range(0, n_examples_for_visualization, batch_size):
-            n = min(batch_size, n_examples_for_visualization - i)
-            batches.append(self.volume[i : i + n])
-        return batches
+    def get_all_batches(self):
+        for i in range(0, self.n, batch_size):
+            m = min(batch_size, self.n - i)
+            sampled_points = sample_points(self.shape_points[i : i + m])
+            yield (self.volume[i : i + m], sampled_points, self.closest_points[i : i + m])
 
 class Stats:
     def __init__(self):
-        total_n_iters = sum(n_iterations)
-        self.cov = np.zeros(total_n_iters)
-        self.cons = np.zeros(total_n_iters)
-        self.prob_means = np.zeros(total_n_iters)
-        self.penalty_means = np.zeros(total_n_iters)
+        self.n = sum(n_iterations)
+        self.cov = np.zeros(self.n)
+        self.cons = np.zeros(self.n)
+        self.prob_means = np.zeros(self.n)
+        self.penalty_means = np.zeros(self.n)
+
+        self.m = self.n // save_iteration
+        self.validation_loss = np.zeros(self.m)
 
     def save_plots(self):
-        x = np.arange(1, sum(n_iterations) + 1)
+        x = np.arange(1, self.n + 1)
 
         plt.figure(figsize = (20, 5))
         plt.plot(x, self.cov)
@@ -165,6 +173,15 @@ class Stats:
         plt.xlabel('iteration')
         plt.ylabel('consistency')
         plt.savefig('graphs/consistency.png')
+
+        plt.figure(figsize = (20, 5))
+        plt.plot(x, self.cov + self.cons)
+        v = np.arange(save_iteration, self.n + 1, save_iteration)
+        plt.plot(v, self.validation_loss) 
+        plt.xlabel('iteration')
+        plt.ylabel('loss')
+        plt.legend()
+        plt.savefig('graphs/loss.png')
 
         plt.clf()
         plt.figure(figsize = (20, 5))
@@ -193,19 +210,18 @@ def scale_weights(network):
     # Enako za 'prob_factor'.
     _scale_weights(network.primitives.prob.layer, prob_factors)
 
-def train(network, batch_provider, params, stats):
-    if params.phase == 1:
-        scale_weights(network)
-
+def train(network, train_batches, validation_batches, params, stats):
     optimizer = torch.optim.Adam(network.parameters(), lr = learning_rate)
     sampler = CuboidSurface(n_samples_per_primitive)
     reinforce_updater = ReinforceRewardUpdater(reinforce_baseline_momentum)
+
+    best_validation_loss = float('inf')
 
     network.train()
     for _ in range(params.n_iterations):
         optimizer.zero_grad()
 
-        (volume, sampled_points, closest_points) = batch_provider.get()
+        (volume, sampled_points, closest_points) = train_batches.get()
         P = network(volume, params)
         cov, cons = loss(volume, P, sampled_points, closest_points, sampler)
         l = cov + cons
@@ -231,14 +247,15 @@ def train(network, batch_provider, params, stats):
 
         optimizer.step()
 
-        i = batch_provider.iteration - 1
+        i = train_batches.iteration - 1
         stats.cov[i] = cov.mean()
         stats.cons[i] = cons.mean()
         stats.prob_means[i] = P.prob.mean()
         stats.penalty_means[i] = total_penalty / n_primitives
 
-        if batch_provider.iteration % output_iteration == 0:
-            i += 1
+        i += 1
+
+        if i % output_iteration == 0:
             cov_mean = stats.cov[i - output_iteration : i].mean()
             cons_mean = stats.cons[i - output_iteration : i].mean()
             mean_prob = stats.prob_means[i - output_iteration : i].mean()
@@ -249,41 +266,30 @@ def train(network, batch_provider, params, stats):
             print(f'    mean prob: {mean_prob}')
             print(f'    mean penalty: {mean_penalty}')
 
-        if batch_provider.iteration % save_iteration == 0:
-            torch.save(network.state_dict(), 'save.torch')
+        if i % save_iteration == 0 and i - 1 > (0 if params.phase == 1 else n_iterations[0]):
+            validation_loss = .0
 
             network.eval()
             with torch.no_grad():
-                parameters = np.zeros((n_examples_for_visualization, n_primitives, 10))
+                for (volume, sampled_points, closest_points) in validation_batches.get_all_batches():
+                    P = network(volume_batch, params)
+                    cov, cons = loss(volume, P, sampled_points, closest_points, sampler)
+                    validation_loss += (cov + cons).sum()
 
-                k = 0
-                for volume_batch in batch_provider.get_batches_for_visualization():
-                    X = network(volume_batch, params)
-                    vertices = predictions_to_mesh(X).cpu()
-                    nv = vertices.size(0)
+            validation_loss /= validation_batches.n
 
-                    parameters[k : k + nv, :, :3] = X.dims.cpu().numpy()
-                    parameters[k : k + nv, :, 3:7] = X.quat.cpu().numpy()
-                    parameters[k : k + nv, :, 7:] = X.trans.cpu().numpy()
+            if validation_loss < best_validation_loss:
+                best_validation_loss = validation_loss
+                torch.save(network.state_dict(), 'save.torch')
 
-                    for j in range(nv):
-                        # Pri inferenci vzamemo samo kvadre z verjetnostjo prisotnosti > 0.5:
-                        v = vertices[j, X.prob[j].cpu() > 0.5].numpy()
-                        write_predictions_mesh(v, f'i{i}_{k + j + 1}')
+            j = train_batches.iteration // save_iteration - 1
+            stats.validation_loss[j] = validation_loss
 
-                    k += nv
-
-                parameters = parameters.reshape(n_examples_for_visualization, -1)
-                np.save('shape_parameters.npy', parameters)
-                return
+            print(f'~~~~ iteration {i} ~~~~')
+            print(f'    validation loss: {validation_loss}')
+            print(f'    best validation loss: {best_validation_loss}')
 
             network.train()
-
-def load_evaluation_model():
-    model = Network(PhaseParams(1))
-    model.load_state_dict(torch.load('save.torch'))
-    model.eval()
-    return model
 
 if __name__ == "__main__":
     if shapenet_dir is None:
@@ -291,18 +297,23 @@ if __name__ == "__main__":
     else:
         train_set = load_shapenet(shapenet_dir)
 
-    batch_provider = BatchProvider(train_set)
-    stats = Stats()
+    validation_set, _ = load_validation_and_test(urocell_dir, grid_size)
 
-    # Za zdaj bomo vizualizirali kar primere iz učne množice. Tako je tudi v
-    # referenčni implementaciji.
-    for i, shape in enumerate(train_set[:n_examples_for_visualization]):
-        write_volume_mesh(shape, i + 1)
+    train_batches = BatchProvider(train_set)
+    validation_batches = BatchProvider(validation_set)
+
+    stats = Stats()
 
     network = Network(PhaseParams(0))
     network.to(device)
 
-    for phase in range(2):
-        train(network, batch_provider, PhaseParams(phase), stats)
+    train(network, train_batches, validation_batches, PhaseParams(0), stats)
+
+    network = Network(PhaseParams(1))
+    network.load_state_dict(torch.load('save.torch'))
+    scale_weights(network)
+    network.to(device)
+
+    train(network, train_batches, validation_batches, PhaseParams(1), stats)
 
     stats.save_plots()

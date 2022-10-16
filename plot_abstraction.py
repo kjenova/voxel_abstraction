@@ -3,14 +3,16 @@ import numpy as np
 from trimesh import Trimesh
 from PIL import Image
 import pyvista as pv
-from train import load_evaluation_model, PhaseParams
+from train import Network, PhaseParams
 from load_urocell import load_validation_and_test
 from generate_mesh import predictions_to_mesh
 from bruteforce_view import bruteforce_view
 from write_mesh import cuboid_faces
 from colors import colors
 
-model = load_evaluation_model()
+model = Network(PhaseParams(1))
+model.load_state_dict(torch.load('save.torch'))
+model.eval()
 
 grid_size = 32
 prob_threshold = .5
