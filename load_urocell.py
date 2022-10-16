@@ -1,6 +1,6 @@
 import nibabel
 from skimage import measure
-from load_shapes import resize_volume, VolumeFaces
+from load_shapes import resize_volume, VolumeFaces, closest_points_grid
 
 test_data = [
     ('fib1-1-0-3.nii.gz', [[0], [1, 2]]),
@@ -10,12 +10,14 @@ test_data = [
 ]
 
 class UroCellShape:
-    def __init__(self, volume, grid_size):
+    def __init__(self, volume, grid_size, n_points_per_shape):
         self.volume = volume
         self.resized_volume = resize_volume(volume, grid_size)
         self.volume_faces = VolumeFaces(volume)
+        self.shape_points = self.volume_faces.sample(n_points_per_shape)
+        self.closest_points_grid = closest_points_grid(self.resized_volume, self.volume_faces)
 
-def load_validation_and_test(basedir, grid_size, discard_validation = False):
+def load_validation_and_test(basedir, grid_size, n_points_per_shape = 10000, discard_validation = False):
     validation = []
     test = []
 
@@ -31,8 +33,8 @@ def load_validation_and_test(basedir, grid_size, discard_validation = False):
 
             for j, component in enumerate(p.filled_image for p in props):
                 if j in indices:
-                    test.append(UroCellShape(component, grid_size))
+                    test.append(UroCellShape(component, grid_size, n_points_per_shape))
                 elif not discard_validation:
-                    validation.append(UroCellShape(component, grid_size))
+                    validation.append(UroCellShape(component, grid_size, n_points_per_shape))
 
     return validation, test

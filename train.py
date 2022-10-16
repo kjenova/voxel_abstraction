@@ -297,7 +297,7 @@ if __name__ == "__main__":
     else:
         train_set = load_shapenet(shapenet_dir)
 
-    validation_set, _ = load_validation_and_test(urocell_dir, grid_size)
+    validation_set, _ = load_validation_and_test(urocell_dir, grid_size, n_points_per_shape)
 
     train_batches = BatchProvider(train_set)
     validation_batches = BatchProvider(validation_set)

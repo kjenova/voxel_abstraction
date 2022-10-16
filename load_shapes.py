@@ -7,6 +7,7 @@ from scipy.ndimage.morphology import binary_erosion
 from skimage import measure
 from skimage.transform import resize
 from tqdm import tqdm
+from trimesh import Trimesh, proximity
 
 np.random.seed(0x5EED)
 
@@ -101,7 +102,8 @@ def voxel_center_points(size):
 
     return torch.cartesian_prod(x, y, z)
 
-def closest_points_grid(volume):
+# Tukaj za najbližjo točko vzamemo kar center najbližjega voksla:
+def _closest_points_grid(volume):
     centers = voxel_center_points(volume.shape)
     centers = centers.reshape(-1, 3)
     n_points = centers.size(0)
@@ -114,14 +116,23 @@ def closest_points_grid(volume):
 
     return centers[inds, :]
 
+def closest_points_grid(volume, volume_faces):
+    centers = voxel_center_points(volume.shape)
+    centers = centers.reshape(-1, 3)
+    n_points = centers.size(0)
+
+    mesh = Trimesh(*volume_faces.get_mesh())
+    return proximity.closest_point(mesh, centers)
+
 class Shape:
     def __init__(self, volume, grid_size, n_points_per_shape):
         self.volume = volume
         self.resized_volume = resize_volume(volume, grid_size)
         self.volume_faces = VolumeFaces(volume)
         self.resized_volume_faces = VolumeFaces(self.resized_volume)
-        self.shape_points = self.resized_volume_faces.sample(n_points_per_shape)
-        self.closest_points = closest_points_grid(self.resized_volume)
+        self.shape_points = self.volume_faces.sample(n_points_per_shape)
+        # self.closest_points = _closest_points_grid(self.resized_volume)
+        self.closest_points = closest_points_grid(self.resized_volume, self.volume_faces)
 
 def load_shapes(grid_size, n_components, n_points_per_shape):
     shapes_path = 'shapes.pickle'
