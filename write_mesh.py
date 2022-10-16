@@ -25,16 +25,6 @@ cuboid_faces = np.asarray([ \
     [4, 5, 7, 6] \
 ])
 
-def prediction_vertices_to_trimesh(vertices):
-    p = vertices.shape[0]
-    v = vertices.reshape(-1, 3)
-    f = cuboid_faces.reshape(1, 6, 4).repeat(p, axis = 0)
-    f += 8 * np.arange(p).reshape(p, 1, 1)
-    f = f.reshape(-1, 4)
-    c = colors[:p].reshape(p, 1, 3).repeat(6, axis = 1)
-    c = c.reshape(-1, 3)
-    return Trimesh(v, f, face_colors = c)
-
 def write_predictions_mesh(vertices, name):
     mtl_lines = []
     p = vertices.shape[0]

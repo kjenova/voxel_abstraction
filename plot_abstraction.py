@@ -6,8 +6,9 @@ import pyvista as pv
 from train import load_evaluation_model, PhaseParams
 from load_urocell import load_validation_and_test
 from generate_mesh import predictions_to_mesh
-from write_mesh import prediction_vertices_to_trimesh
 from bruteforce_view import bruteforce_view
+from write_mesh import cuboid_faces
+from colors import colors
 
 model = load_evaluation_model()
 
@@ -32,15 +33,26 @@ plot_image_size = [plot_image_width, plot_image_height]
 images = []
 p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 
+def prediction_vertices_to_mesh(vertices):
+    p = vertices.shape[0]
+    v = vertices.reshape(-1, 3)
+    f = cuboid_faces.reshape(1, 6, 4).repeat(p, axis = 0)
+    f += 8 * np.arange(p).reshape(p, 1, 1)
+    f = f.reshape(-1, 4)
+    c = colors[:p].reshape(p, 1, 3).repeat(8, axis = 1)
+    c = c.reshape(-1, 3)
+
+    return pv.wrap(Trimesh(v, f)), c
+
 for i in range(10):
     vertices, faces = test[i].volume_faces.get_mesh()
     volume_mesh = pv.wrap(Trimesh(vertices, faces))
 
     v = predictions_vertices[i, P.prob[i].cpu() > prob_threshold].numpy()
-    predictions_mesh = pv.wrap(prediction_vertices_to_trimesh(v))
+    predictions_mesh, vertex_colors = prediction_vertices_to_mesh(v)
 
     volume_actor = p.add_mesh(volume_mesh)
-    predictions_actor = p.add_mesh(predictions_mesh)
+    predictions_actor = p.add_mesh(predictions_mesh, scalars = vertex_colors, rgb = True)
     best_image = bruteforce_view(p, n_angles)
     p.remove_actor(volume_actor)
     p.remove_actor(predictions_actor)
