@@ -21,7 +21,7 @@ max_shape_radius = np.sqrt(3) / 2 + 1e-4
 
 # To je slika oblike 'mesh', ki je tako zarotirana,
 # da je slika čimbolj zapolnjena.
-def bruteforce_view(p, n_angles, camera_radius = 2.5):
+def bruteforce_view(p, n_angles, camera_radius = 2.5, transparent = False):
     clipping_range = (camera_radius - max_shape_radius, camera_radius + 2 * max_shape_radius)
 
     p.store_image = True
@@ -42,8 +42,8 @@ def bruteforce_view(p, n_angles, camera_radius = 2.5):
             p.set_viewup(up, reset = False)
             p.camera.clipping_range = clipping_range
 
-            image = p.screenshot() # transparent_background = True)
-            image = Image.fromarray(image, 'RGB')
+            image = p.screenshot(transparent_background = transparent)
+            image = Image.fromarray(image, 'RGBA' if transparent else 'RGB')
             depth = p.get_image_depth()
 
             n_empty_pixels = np.isnan(depth).sum()

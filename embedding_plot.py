@@ -25,7 +25,7 @@ for i, shape in enumerate(dataset):
     mesh = pv.wrap(Trimesh(vertices, faces))
 
     mesh_actor = p.add_mesh(mesh)
-    best_image = bruteforce_view(p, n_angles)
+    best_image = bruteforce_view(p, n_angles, transparent = True)
     p.remove_actor(mesh_actor)
 
     images.append(best_image)
