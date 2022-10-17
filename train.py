@@ -252,7 +252,6 @@ def train(network, train_batches, validation_batches, params, stats):
         stats.cons[i] = cons.mean()
         stats.prob_means[i] = P.prob.mean()
         stats.penalty_means[i] = total_penalty / n_primitives
-
         i += 1
 
         if i % output_iteration == 0:
@@ -266,7 +265,7 @@ def train(network, train_batches, validation_batches, params, stats):
             print(f'    mean prob: {mean_prob}')
             print(f'    mean penalty: {mean_penalty}')
 
-        if i % save_iteration == 0 and i - 1 > (0 if params.phase == 1 else n_iterations[0]):
+        if i % save_iteration == 0:
             validation_loss = .0
 
             network.eval()
