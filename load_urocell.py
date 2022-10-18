@@ -46,7 +46,7 @@ def load_urocell_preprocessed(basedir):
 
     for subvolume_dir, indices_by_label in test_data:
         for label, indices in enumerate(indices_by_label):
-            loaded = load_preprocessed(f'{basedir}/{subvolume_dir.replace(".nii.gz", "")}_{label + 1}')
+            loaded = load_preprocessed(f'{basedir}/{subvolume_dir.replace(".nii.gz", "")}/{label + 1}')
             
             for i in range(len(loaded)):
                 if i in indices_by_label[label]:

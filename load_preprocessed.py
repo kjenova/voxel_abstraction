@@ -6,12 +6,11 @@ from load_shapes import VolumeFaces
 
 class PreprocessedShape:
     def __init__(self, mat):
-        self.volume = None
         self.resized_volume = mat['Volume']
-        self.volume_faces = None
-        self.resized_volume_faces = VolumeFaces(self.resized_volume)
         self.shape_points = mat['surfaceSamples']
         self.closest_points = torch.from_numpy(mat['closestPoints'])
+        self.vertices = mat['vertices']
+        self.faces = mat['faces']
 
 def load_preprocessed(directory, max_n_shapes = 1000000):
     shapes = []

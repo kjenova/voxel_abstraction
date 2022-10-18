@@ -11,8 +11,6 @@ from losses import loss
 from reinforce import ReinforceRewardUpdater
 from load_preprocessed import load_preprocessed, PreprocessedShape
 from load_urocell import load_urocell_preprocessed
-from generate_mesh import predictions_to_mesh
-from write_mesh import write_volume_mesh, write_predictions_mesh
 
 random.seed(0x5EED)
 
@@ -135,7 +133,7 @@ class BatchProvider:
 
         self.iteration += 1
 
-        sampled_points = sample_points(self.loaded_shape_points.reshape(-1, 3))
+        sampled_points = sample_points(self.loaded_shape_points)
         return (self.loaded_volume, sampled_points, self.loaded_closest_points)
 
     def get_all_batches(self):
@@ -172,9 +170,9 @@ class Stats:
         plt.savefig('graphs/consistency.png')
 
         plt.figure(figsize = (20, 5))
-        plt.plot(x, self.cov + self.cons)
+        plt.plot(x, self.cov + self.cons, label = 'train')
         v = np.arange(save_iteration, self.n + 1, save_iteration)
-        plt.plot(v, self.validation_loss) 
+        plt.plot(v, self.validation_loss, label = 'validation')
         plt.xlabel('iteration')
         plt.ylabel('loss')
         plt.legend()
@@ -268,7 +266,7 @@ def train(network, train_batches, validation_batches, params, stats):
             network.eval()
             with torch.no_grad():
                 for (volume, sampled_points, closest_points) in validation_batches.get_all_batches():
-                    P = network(volume_batch, params)
+                    P = network(volume, params)
                     cov, cons = loss(volume, P, sampled_points, closest_points, sampler)
                     validation_loss += (cov + cons).sum()
 

@@ -18,7 +18,7 @@ grid_size = 32
 prob_threshold = .5
 remove_redundant = False # TODO
 
-basedir = 'shapenet/chamferData/urocell'
+basedir = 'data/chamferData/urocell'
 _, test = load_urocell_preprocessed(basedir)
 
 volume_batch = torch.stack([torch.Tensor(shape.resized_volume) for shape in test])
@@ -50,8 +50,7 @@ def prediction_vertices_to_mesh(vertices):
     return mesh
 
 for i in range(10):
-    vertices, faces = test[i].volume_faces.get_mesh()
-    volume_mesh = pv.wrap(Trimesh(vertices, faces))
+    volume_mesh = pv.wrap(Trimesh(test[i].vertices, test[i].faces - 1))
 
     v = predictions_vertices[i, P.prob[i].cpu() > prob_threshold].numpy()
     predictions_mesh = prediction_vertices_to_mesh(v)
