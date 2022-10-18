@@ -6,6 +6,8 @@ function [] = preprocess_urocell()
 
     tsdfDir = fullfile(cachedir, 'shapenet', 'chamferData', 'urocell');
 
+    mkdir(tsdfDir)
+
     helper('fib1-0-0-0', tsdfDir);
     helper('fib1-1-0-3', tsdfDir);
     helper('fib1-3-2-1', tsdfDir);
@@ -15,6 +17,7 @@ end
 
 function helper(filename, tsdfDir)
     V = niftiread(fullfile("branched/", strcat(filename, '.nii.gz')));
+    mkdir(fullfile(tsdfDir, filename));
     helper2(filename, V, 1, tsdfDir);
     helper2(filename, V, 2, tsdfDir);
 end
@@ -24,13 +27,15 @@ function helper2(filename, V, label, tsdfDir)
     numSamples = 10000;
     numShapes = 2000;
 
+    mkdir(fullfile(tsdfDir, filename, num2str(label)));
+
     CC = bwconncomp(V == label);
     numPixels = cellfun(@numel, CC.PixelIdxList);
     [sorted, indices] = sort(numPixels, 'descend');
 
     pBar = TimedProgressBar(numShapes, 30, 'Time Remaining : ', ' Percentage Completion ', 'Tsdf Extraction Completed.');
 
-    for i = 1:size(sorted, 1)
+    for i = 1:size(sorted, 2)
         X = zeros(size(V));
         X(CC.PixelIdxList{indices(i)}) = 1;
         cropped = regionprops(X, "FilledImage").FilledImage;
@@ -43,7 +48,7 @@ function helper2(filename, V, label, tsdfDir)
         surfaceSamples = uniform_sampling(FV.faces, standardizedVertices, numSamples);
         surfaceSamples = surfaceSamples';
 
-        maxSize = max(size(cropnumShapesped));
+        maxSize = max(size(cropped));
         Volume = imresize3(cropped, gridSize / maxSize);
         padding = gridSize - size(Volume);
         Volume = padarray(Volume, padding, 0, 'post');
@@ -62,7 +67,7 @@ function helper2(filename, V, label, tsdfDir)
         tsdfGrid = abs(tsdfGrid) .* (1 - 2 * Volume);
         closestPointsGrid = reshape(closestPoints, [size(Xp), 3]);
 
-        tsdfFile = fullfile(tsdfDir, filename, num2str(label), tsdfDir);
+        tsdfFile = fullfile(tsdfDir, filename, num2str(label), strcat(num2str(i), '.mat'));
         savefunc(tsdfFile, tsdfGrid, Volume, closestPointsGrid, surfaceSamples, standardizedVertices, FV.faces);
         pBar.progress();
     end
