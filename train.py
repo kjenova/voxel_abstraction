@@ -9,19 +9,16 @@ from primitives import PrimitivesPrediction
 from cuboid import CuboidSurface
 from losses import loss
 from reinforce import ReinforceRewardUpdater
-from load_shapes import load_shapes, Shape
-from load_shapenet import load_shapenet, ShapeNetShape
-from load_urocell import load_validation_and_test
+from load_preprocessed import load_preprocessed, PreprocessedShape
+from load_urocell import load_urocell_preprocessed
 from generate_mesh import predictions_to_mesh
 from write_mesh import write_volume_mesh, write_predictions_mesh
 
 random.seed(0x5EED)
 
-shapenet_dir = 'shapenet/chamferData/01'
-urocell_dir = '/home/klemenjan/UroCell/mito/branched'
-# Koliko povezanih komponent vzamemo pri celičnih predelkih
-# (pri ShapeNet-u vzamemo vse učne primere):
-n_examples = 2000
+train_dir = 'shapenet/chamferData/01'
+urocell_dir = 'shapenet/chamferData/urocell'
+
 # Število iteracij treniranja v prvi in drugi fazi:
 n_iterations = [20000, 30000]
 # Toliko iteracij se vsak batch ponovi (t.j. po tolikšnem številu
@@ -291,12 +288,9 @@ def train(network, train_batches, validation_batches, params, stats):
             network.train()
 
 if __name__ == "__main__":
-    if shapenet_dir is None:
-        train_set = load_shapes(grid_size, n_examples, n_points_per_shape)
-    else:
-        train_set = load_shapenet(shapenet_dir)
+    train_set = load_preprocessed(train_dir)
 
-    validation_set, _ = load_validation_and_test(urocell_dir, grid_size, n_points_per_shape)
+    validation_set, _ = load_urocell_preprocessed(urocell_dir)
 
     train_batches = BatchProvider(train_set)
     validation_batches = BatchProvider(validation_set)

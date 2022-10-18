@@ -4,7 +4,7 @@ from trimesh import Trimesh
 from PIL import Image
 import pyvista as pv
 from train import Network, PhaseParams
-from load_urocell import load_validation_and_test
+from load_urocell import load_urocell_preprocessed
 from generate_mesh import predictions_to_mesh
 from bruteforce_view import bruteforce_view
 from write_mesh import cuboid_faces
@@ -18,8 +18,8 @@ grid_size = 32
 prob_threshold = .5
 remove_redundant = False # TODO
 
-basedir = '/home/klemenjan/UroCell/mito/branched'
-_, test = load_validation_and_test(basedir, grid_size, discard_validation = True)
+basedir = 'shapenet/chamferData/urocell'
+_, test = load_urocell_preprocessed(basedir)
 
 volume_batch = torch.stack([torch.Tensor(shape.resized_volume) for shape in test])
 with torch.no_grad():

@@ -116,6 +116,7 @@ def _closest_points_grid(volume):
 
     return centers[inds, :]
 
+# Prepočasno!
 def closest_points_grid(volume, volume_faces):
     centers = voxel_center_points(volume.shape)
     centers = centers.reshape(-1, 3)

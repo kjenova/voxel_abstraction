@@ -1,6 +1,7 @@
 import nibabel
 from skimage import measure
 from load_shapes import resize_volume, VolumeFaces, closest_points_grid
+from load_preprocessed import load_preprocessed
 
 test_data = [
     ('fib1-1-0-3.nii.gz', [[0], [1, 2]]),
@@ -14,10 +15,10 @@ class UroCellShape:
         self.volume = volume
         self.resized_volume = resize_volume(volume, grid_size)
         self.volume_faces = VolumeFaces(volume)
-        self.shape_points = self.volume_faces.sample(n_points_per_shape)
-        self.closest_points_grid = closest_points_grid(self.resized_volume, self.volume_faces)
+        # self.shape_points = self.volume_faces.sample(n_points_per_shape)
+        # self.closest_points_grid = closest_points_grid(self.resized_volume, self.volume_faces)
 
-def load_validation_and_test(basedir, grid_size, n_points_per_shape = 10000, discard_validation = False):
+def load_urocell(basedir, grid_size, n_points_per_shape = 10000, discard_validation = False):
     validation = []
     test = []
 
@@ -36,5 +37,21 @@ def load_validation_and_test(basedir, grid_size, n_points_per_shape = 10000, dis
                     test.append(UroCellShape(component, grid_size, n_points_per_shape))
                 elif not discard_validation:
                     validation.append(UroCellShape(component, grid_size, n_points_per_shape))
+
+    return validation, test
+
+def load_urocell_preprocessed(basedir):
+    validation = []
+    test = []
+
+    for subvolume_dir, indices_by_label in test_data:
+        for label, indices in enumerate(indices_by_label):
+            loaded = load_preprocessed(f'{basedir}/{subvolume_dir.replace('.nii.gz', '')}_{label + 1}')
+            
+            for i in range(len(loaded)):
+                if i in indices_by_label[label]:
+                    test.append(loaded[i])
+                else:
+                    validation.append(loaded[i])
 
     return validation, test
