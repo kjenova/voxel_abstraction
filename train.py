@@ -248,10 +248,10 @@ def train(network, train_batches, validation_batches, params, stats):
         i += 1
 
         if i % save_iteration == 0:
-            cov_mean = stats.cov[i - output_iteration : i].mean()
-            cons_mean = stats.cons[i - output_iteration : i].mean()
-            mean_prob = stats.prob_means[i - output_iteration : i].mean()
-            mean_penalty = stats.penalty_means[i - output_iteration : i].mean()
+            cov_mean = stats.cov[i - save_iteration : i].mean()
+            cons_mean = stats.cons[i - save_iteration : i].mean()
+            mean_prob = stats.prob_means[i - save_iteration : i].mean()
+            mean_penalty = stats.penalty_means[i - save_iteration : i].mean()
 
             print(f'---- iteration {i} ----')
             print(f'    loss {cov_mean + cons_mean}, cov: {cov_mean}, cons: {cons_mean}')
