@@ -24,8 +24,6 @@ n_iterations = [20000, 30000]
 # (Bolj strogo gledano se na toliko iteracij ponovi batch z istimi modeli,
 # ker potem še za vsako iteracijo vzorčimo podmnožico točk na površini oblike.)
 repeat_batch_n_iterations = 2
-# Na vsake toliko iteracij se izpiše statistika:
-output_iteration = 1000
 # Na vsake toliko iteracij se shrani model, če je validacijski loss manjši:
 save_iteration = 1000
 
@@ -249,7 +247,7 @@ def train(network, train_batches, validation_batches, params, stats):
         stats.penalty_means[i] = total_penalty / n_primitives
         i += 1
 
-        if i % output_iteration == 0:
+        if i % save_iteration == 0:
             cov_mean = stats.cov[i - output_iteration : i].mean()
             cons_mean = stats.cons[i - output_iteration : i].mean()
             mean_prob = stats.prob_means[i - output_iteration : i].mean()
@@ -260,15 +258,17 @@ def train(network, train_batches, validation_batches, params, stats):
             print(f'    mean prob: {mean_prob}')
             print(f'    mean penalty: {mean_penalty}')
 
-        if i % save_iteration == 0:
             validation_loss = .0
 
             network.eval()
+
             with torch.no_grad():
                 for (volume, sampled_points, closest_points) in validation_batches.get_all_batches():
                     P = network(volume, params)
                     cov, cons = loss(volume, P, sampled_points, closest_points, sampler)
                     validation_loss += (cov + cons).sum()
+
+            network.train()
 
             validation_loss /= validation_batches.n
 
@@ -279,11 +279,8 @@ def train(network, train_batches, validation_batches, params, stats):
             j = train_batches.iteration // save_iteration - 1
             stats.validation_loss[j] = validation_loss
 
-            print(f'~~~~ iteration {i} ~~~~')
             print(f'    validation loss: {validation_loss}')
             print(f'    best validation loss: {best_validation_loss}')
-
-            network.train()
 
 if __name__ == "__main__":
     train_set = load_preprocessed(train_dir)
