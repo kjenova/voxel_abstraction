@@ -16,8 +16,8 @@ from write_mesh import write_volume_mesh, write_predictions_mesh
 
 random.seed(0x5EED)
 
-train_dir = 'shapenet/chamferData/01'
-urocell_dir = 'shapenet/chamferData/urocell'
+train_dir = 'data/chamferData/01'
+urocell_dir = 'data/chamferData/urocell'
 
 # Število iteracij treniranja v prvi in drugi fazi:
 n_iterations = [20000, 30000]

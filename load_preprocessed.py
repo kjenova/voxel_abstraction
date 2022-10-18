@@ -4,7 +4,7 @@ import glob
 from os import path
 from load_shapes import VolumeFaces
 
-class ShapeNetShape:
+class PreprocessedShape:
     def __init__(self, mat):
         self.volume = None
         self.resized_volume = mat['Volume']
@@ -17,4 +17,4 @@ def load_preprocessed(directory, max_n_shapes = 1000000):
     shapes = []
     filenames = glob.glob(f'{directory}/*.mat')[:max_n_shapes]
     filenames.sort(key = lambda x: int(path.basename(x)[:-4]))
-    return [ShapeNetShape(loadmat(f))) for f in filenames]
+    return [PreprocessedShape(loadmat(f)) for f in filenames]

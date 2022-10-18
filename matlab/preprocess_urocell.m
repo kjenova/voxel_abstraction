@@ -36,6 +36,10 @@ function helper2(filename, V, label, tsdfDir)
     pBar = TimedProgressBar(numShapes, 30, 'Time Remaining : ', ' Percentage Completion ', 'Tsdf Extraction Completed.');
 
     for i = 1:size(sorted, 2)
+        if sorted(i) < 2
+            break;
+        end
+
         X = zeros(size(V));
         X(CC.PixelIdxList{indices(i)}) = 1;
         cropped = regionprops(X, "FilledImage").FilledImage;
