@@ -78,7 +78,7 @@ class Network(nn.Module):
     def __init__(self, params):
         super().__init__()
 
-        self.encoder = VolumeEncoder(5, 4, 1, use_batch_normalization_conv)
+        self.encoder = VolumeEncoder(np.around(np.log2(grid_size)).astype(int), 4, 1, use_batch_normalization_conv)
         n = self.encoder.n_out_channels
 
         layers = []
@@ -105,25 +105,28 @@ class Network(nn.Module):
 
 def sample_points(all_points):
     [b, n] = all_points.size()[:2]
-    i = torch.randint(0, n, (b, n_samples_per_shape), device = device)
-    i += n * torch.arange(0, b, device = device).reshape(-1, 1)
+    i = torch.randint(0, n, (b, n_samples_per_shape), device = all_points.device)
+    i += n * torch.arange(0, b, device = all_points.device).reshape(-1, 1)
     return all_points.reshape(-1, 3)[i]
 
 class BatchProvider:
-    def __init__(self, shapes, test = False):
-        self.volume = torch.stack([torch.from_numpy(s.resized_volume.astype(np.float32)) for s in shapes]).to(device)
+    def __init__(self, shapes, test = False, gpu = True):
+        self.device = device if gpu else torch.device('cpu')
+
+        self.volume = torch.stack([torch.from_numpy(s.resized_volume.astype(np.float32)) for s in shapes]).to(self.device)
         self.n = self.volume.size(0)
 
         if not test:
-            self.shape_points = torch.stack([torch.from_numpy(s.shape_points) for s in shapes]).to(device)
-            self.closest_points = torch.stack([s.closest_points for s in shapes]).to(device)
+            self.shape_points = torch.stack([torch.from_numpy(s.shape_points) for s in shapes]).to(self.device)
+            self.closest_points = torch.stack([s.closest_points for s in shapes]).to(self.device)
             self.iteration = 0
 
     def load_batch(self):
-        indices = torch.randint(0, self.n, (min(batch_size, self.n),), device = device)
-        self.loaded_volume = self.volume[indices]
-        self.loaded_shape_points = self.shape_points[indices]
-        self.loaded_closest_points = self.closest_points[indices]
+        indices = torch.randint(0, self.n, (min(batch_size, self.n),), device = self.device)
+        # Če je gpu = False, na GPU pošljemo samo batche, drugače pa so že celotni tenzorji tam.
+        self.loaded_volume = self.volume[indices].to(device)
+        self.loaded_shape_points = self.shape_points[indices].to(device)
+        self.loaded_closest_points = self.closest_points[indices].to(device)
 
     def get(self):
         if self.iteration % repeat_batch_n_iterations == 0:
@@ -137,8 +140,8 @@ class BatchProvider:
     def get_all_batches(self):
         for i in range(0, self.n, batch_size):
             m = min(batch_size, self.n - i)
-            sampled_points = sample_points(self.shape_points[i : i + m])
-            yield (self.volume[i : i + m], sampled_points, self.closest_points[i : i + m])
+            sampled_points = sample_points(self.shape_points[i : i + m]).to(device)
+            yield (self.volume[i : i + m].to(device), sampled_points, self.closest_points[i : i + m].to(device))
 
 class Stats:
     def __init__(self):
@@ -287,8 +290,8 @@ if __name__ == "__main__":
 
     validation_set, _ = load_urocell_preprocessed(urocell_dir)
 
-    train_batches = BatchProvider(train_set)
-    validation_batches = BatchProvider(validation_set)
+    train_batches = BatchProvider(train_set, gpu = False)
+    validation_batches = BatchProvider(validation_set, gpu = False)
 
     stats = Stats()
 

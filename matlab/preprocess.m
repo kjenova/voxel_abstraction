@@ -4,9 +4,9 @@ function [] = preprocess()
     shapenetDir = shapenetDir;
     cachedir = cachedir;
 
-    tsdfDir = fullfile(cachedir, 'shapenet', 'chamferData', '00');
+    tsdfDir = fullfile(cachedir, 'shapenet', 'chamferData', '01');
 
-    gridSize = 32;
+    gridSize = 64;
     numSamples = 10000;
     numShapes = 2000;
 
@@ -36,7 +36,7 @@ function [] = preprocess()
         Volume = imresize3(cropped, gridSize / maxSize);
         padding = gridSize - size(Volume);
         Volume = padarray(Volume, padding, 0, 'post');
-        if ~isequal(size(Volume), [32 32 32])
+        if ~isequal(size(Volume), [gridSize gridSize gridSize])
             disp("!!!!!!!!");
             disp(i);
         end

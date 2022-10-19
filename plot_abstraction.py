@@ -14,7 +14,6 @@ model = Network(PhaseParams(1))
 model.load_state_dict(torch.load('save.torch'))
 model.eval()
 
-grid_size = 32
 prob_threshold = .5
 remove_redundant = False # TODO
 
