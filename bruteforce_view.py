@@ -21,7 +21,7 @@ max_shape_radius = np.sqrt(3) / 2 + 1e-4
 
 # To je slika oblike 'mesh', ki je tako zarotirana,
 # da je slika čimbolj zapolnjena.
-def bruteforce_view(p, n_angles, camera_radius = 2.5, transparent = False):
+def bruteforce_view(p, n_angles, camera_radius = 3., transparent = False):
     clipping_range = (camera_radius - max_shape_radius, camera_radius + 2 * max_shape_radius)
 
     p.store_image = True

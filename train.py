@@ -30,7 +30,7 @@ save_iteration = 1000
 # Ali napovedujemo prisotnost primitivov (True) ali pa kar vedno vzamemo vse (False):
 prune_primitives = True
 n_primitives = 20
-grid_size = 32
+grid_size = 64
 # Iz vsake oblike smo med predprocesiranjem vzorčili 10.000 točk:
 n_points_per_shape = 10000
 # Vendar naenkrat bomo upoštevali samo 1000 naključnih točk:
@@ -168,7 +168,7 @@ class Stats:
         plt.savefig('graphs/consistency.png')
 
         plt.figure(figsize = (20, 5))
-        plt.plot(x, self.cov + self.cons, label = 'train')
+        plt.plot(x[save_iteration:], (self.cov + self.cons)[save_iteration:], label = 'train')
         v = np.arange(save_iteration, self.n + 1, save_iteration)
         plt.plot(v, self.validation_loss, label = 'validation')
         plt.xlabel('iteration')
