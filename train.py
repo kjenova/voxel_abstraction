@@ -1,27 +1,16 @@
 import torch
-import torch.nn as nn
 import numpy as np
-import matplotlib.pyplot as plt
 
-from tulsiani.volume_encoder import VolumeEncoder
-from tulsiani.net_utils import weights_init
-from tulsiani.primitives import PrimitivesPrediction
+from tulsiani.network import TulsianiNetwork, TulsianiParams
+from tulsiani.net_utils import scale_weights
 from tulsiani.reinforce import ReinforceRewardUpdater
+from tulsiani.stats import TulsianiStats
 
 from common.cuboid import CuboidSurface
-from common.losses import loss
+from common.reconstruction_losses import reconstruction_loss
 
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
-
-class TulsianiParams:
-    @property
-    def dims_factor(self):
-        return self.dims_factors[self.phase]
-
-    @property
-    def prob_factor(self):
-        return self.prob_factors[self.phase]
 
 params = TulsianiParams()
 
@@ -77,19 +66,19 @@ params.existence_penalties = [.0, 8e-5]
 params.device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
 def train(network, train_batches, validation_batches, params, stats):
-    optimizer = torch.optim.Adam(network.parameters(), lr = learning_rate)
-    sampler = CuboidSurface(n_samples_per_primitive)
-    reinforce_updater = ReinforceRewardUpdater(reinforce_baseline_momentum)
+    optimizer = torch.optim.Adam(network.parameters(), lr = params.learning_rate)
+    sampler = CuboidSurface(params.n_samples_per_primitive)
+    reinforce_updater = ReinforceRewardUpdater(params.reinforce_baseline_momentum)
 
     best_validation_loss = float('inf')
 
     network.train()
-    for _ in range(params.n_iterations):
+    for _ in range(params.n_iterations[params.phase]):
         optimizer.zero_grad()
 
         (volume, sampled_points, closest_points) = train_batches.get()
         P = network(volume, params)
-        cov, cons = loss(volume, P, sampled_points, closest_points, sampler)
+        cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params)
         l = cov + cons
 
         total_penalty = .0
@@ -99,9 +88,6 @@ def train(network, train_batches, validation_batches, params, stats):
             # Edina razlika je v tem, da bi v primeru, da bi maksimizirali 'reward = - penalty', morali
             # potem še pri gradientu dodati minus.
             for p in range(n_primitives):
-                # Glede na članek bi bila sledeča formula, ampak če bi sledili referenčni implementaciji
-                # bi pa bilo 'l + params.existence_penalty * torch.sum(P.exist[:, p])':
-                # https://github.com/nileshkulkarni/volumetricPrimitivesPytorch/blob/367d2bc3f7d2ec122c4e2066c2ee2a922cf4e0c8/experiments/cadAutoEncCuboids/primSelTsdfChamfer.py#L142
                 penalty = l + params.existence_penalty * P.exist[:, p]
                 total_penalty += penalty.mean().item()
                 P.log_prob[:, p] *= reinforce_updater.update(penalty)
@@ -120,7 +106,7 @@ def train(network, train_batches, validation_batches, params, stats):
         stats.penalty_means[i] = total_penalty / n_primitives
         i += 1
 
-        if i % save_iteration == 0:
+        if i % params.save_iteration == 0:
             cov_mean = stats.cov[i - save_iteration : i].mean()
             cons_mean = stats.cons[i - save_iteration : i].mean()
             mean_prob = stats.prob_means[i - save_iteration : i].mean()
@@ -138,7 +124,7 @@ def train(network, train_batches, validation_batches, params, stats):
             with torch.no_grad():
                 for (volume, sampled_points, closest_points) in validation_batches.get_all_batches():
                     P = network(volume, params)
-                    cov, cons = loss(volume, P, sampled_points, closest_points, sampler)
+                    cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params)
                     validation_loss += (cov + cons).sum()
 
             network.train()
@@ -147,34 +133,38 @@ def train(network, train_batches, validation_batches, params, stats):
 
             if validation_loss < best_validation_loss:
                 best_validation_loss = validation_loss
-                torch.save(network.state_dict(), 'save.torch')
+                torch.save(network.state_dict(), 'results/tulsiani/save.torch')
 
-            j = train_batches.iteration // save_iteration - 1
+            j = train_batches.iteration // params.save_iteration - 1
             stats.validation_loss[j] = validation_loss
 
             print(f'    validation loss: {validation_loss}')
             print(f'    best validation loss: {best_validation_loss}')
 
-if __name__ == "__main__":
-    train_set = load_preprocessed(train_dir)
+if __name__ == '__main__':
+    os.makedirs('results/tulsiani/graphs')
 
-    validation_set, _ = load_urocell_preprocessed(urocell_dir)
+    train_set = load_preprocessed(params.train_dir)
 
-    train_batches = BatchProvider(train_set, gpu = False)
-    validation_batches = BatchProvider(validation_set, gpu = False)
+    validation_set, _ = load_urocell_preprocessed(params.urocell_dir)
 
-    stats = Stats()
+    train_batches = BatchProvider(train_set, params, store_on_gpu = False)
+    validation_batches = BatchProvider(validation_set, params, store_on_gpu = False)
 
-    network = Network(PhaseParams(0))
-    network.to(device)
+    stats = TulsianiStats()
 
-    train(network, train_batches, validation_batches, PhaseParams(0), stats)
+    params.phase = 0
+    network = TulsianiNetwork(params)
+    network.to(params.device)
 
-    network = Network(PhaseParams(1))
-    network.load_state_dict(torch.load('save.torch'))
+    train(network, train_batches, validation_batches, params, stats)
+
+    params.phase = 1
+    network = TulsianiNetwork(params)
+    network.load_state_dict(torch.load('results/tulsiani/save.torch'))
     scale_weights(network)
-    network.to(device)
+    network.to(params.device)
 
-    train(network, train_batches, validation_batches, PhaseParams(1), stats)
+    train(network, train_batches, validation_batches, params, stats)
 
-    stats.save_plots()
+    stats.save_plots('results/tulsiani/graphs')

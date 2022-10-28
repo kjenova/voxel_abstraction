@@ -4,7 +4,16 @@ from volume_encoder import VolumeEncoder
 from net_utils import weights_init
 from primitives import PrimitivesPrediction
 
-class Network(nn.Module):
+class TulsianiParams:
+    @property
+    def dims_factor(self):
+        return self.dims_factors[self.phase]
+
+    @property
+    def prob_factor(self):
+        return self.prob_factors[self.phase]
+
+class TulsianiNetwork(nn.Module):
     def __init__(self, params):
         super().__init__()
 

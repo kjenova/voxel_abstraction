@@ -46,8 +46,9 @@ def consistency(volume, P, sampler, closest_points_grid):
     distance, weights = _consistency(volume, P, sampler, closest_points_grid)
     return (distance * weights).sum((1, 2))
 
-def loss(volume, primitives, sampled_points, closest_points_grid, sampler):
+def reconstruction_loss(volume, primitives, sampled_points, closest_points_grid, params):
     cov = coverage(primitives, sampled_points)
+    sampler = CuboidSurface(params.n_samples_per_primitive)
     cons = consistency(volume, primitives, sampler, closest_points_grid)
     return cov, cons
 
