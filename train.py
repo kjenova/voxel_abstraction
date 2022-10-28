@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import random
 import matplotlib.pyplot as plt
 from volume_encoder import VolumeEncoder
 from net_utils import weights_init
@@ -11,8 +10,6 @@ from losses import loss
 from reinforce import ReinforceRewardUpdater
 from load_preprocessed import load_preprocessed, PreprocessedShape
 from load_urocell import load_urocell_preprocessed
-
-random.seed(0x5EED)
 
 train_dir = 'data/chamferData/01'
 urocell_dir = 'data/chamferData/urocell'
