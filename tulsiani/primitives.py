@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.bernoulli import Bernoulli
+
 from net_utils import weights_init
 
 class ParameterPrediction(nn.Module):
@@ -43,8 +44,10 @@ class PrimitivesPrediction(nn.Module):
     def __init__(self, n_input_channels, n_primitives, params):
         super().__init__()
 
-        self.prune_primitives = params.prune_primitives
         self.n_primitives = n_primitives
+        self.prune_primitives = params.prune_primitives
+        self.dims_factor = params.dims_factor
+        self.prob_factor = params.prob_factor
 
         dims_bias = torch.Tensor([-3] * 3) / params.dims_factor
         self.dims = ParameterPrediction(n_input_channels, n_primitives, 3, dims_bias, nn.Sigmoid())
@@ -58,10 +61,10 @@ class PrimitivesPrediction(nn.Module):
         probs_bias[0] = 2.5 / params.prob_factor
         self.prob.layer.bias.data = probs_bias
 
-    def forward(self, feature, params):
+    def forward(self, feature):
         # Dimenzije že kar na tem mestu delimo z 2, kajti drugače bi jih morali na treh različnih mestih.
         # (Pa tudi v kodi, po kateri se zgledujemo, je tako: https://github.com/nileshkulkarni/volumetricPrimitivesPytorch)
-        dims = self.dims(feature, params.dims_factor) * .5
+        dims = self.dims(feature, self.dims_factor) * .5
         quat = F.normalize(self.quat(feature), dim = -1)
         # Ker rotacijo opravimo pred translacijo, moramo rotacijo upoštevati pri določanju maksimalne vrednosti translacije.
         # V ekstremnem primeru se kvader po i-ti dimenziji razteza od - sqrt(3) / 2 do sqrt(3) / 2. Da ga spravimo izven
@@ -72,7 +75,7 @@ class PrimitivesPrediction(nn.Module):
         trans = self.trans(feature) * .5
 
         if self.prune_primitives:
-            prob = self.prob(feature, params.prob_factor).squeeze()
+            prob = self.prob(feature, self.prob_factor).squeeze()
             distr = Bernoulli(prob)
             exist = distr.sample()
             log_prob = distr.log_prob(exist)

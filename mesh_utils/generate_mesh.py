@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from transform import primitive_to_world_space
 
-def predictions_to_mesh(P):
+def predictions_to_mesh_vertices(P):
     [b, p] = P.dims.size()[:2]
     vertices = torch.zeros(b, p, 8, 3, device = P.dims.device)
 

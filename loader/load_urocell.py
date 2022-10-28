@@ -40,6 +40,7 @@ def load_urocell(basedir, grid_size, n_points_per_shape = 10000, discard_validat
 
     return validation, test
 
+# Samo tale funkcija se uporablja:
 def load_urocell_preprocessed(basedir):
     validation = []
     test = []

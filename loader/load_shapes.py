@@ -9,6 +9,9 @@ from skimage.transform import resize
 from tqdm import tqdm
 from trimesh import Trimesh, proximity
 
+# V tej skripti se vse predprocesiranje izvaja v Python-u (namesto Matlab-u),
+# ampak se ne uporablja, ker je prepočasno.
+
 np.random.seed(0x5EED)
 
 def split_padding(p):

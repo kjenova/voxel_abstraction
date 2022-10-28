@@ -25,7 +25,7 @@ cuboid_faces = np.asarray([ \
     [4, 5, 7, 6] \
 ])
 
-def write_predictions_mesh(vertices, name):
+def write_predictions_mesh(vertices, name, directory):
     mtl_lines = []
     p = vertices.shape[0]
 
@@ -47,7 +47,7 @@ def write_predictions_mesh(vertices, name):
             f = cuboid_faces[j] + 8 * i + 1
             mtl_lines.append(f'f {f[0]} {f[1]} {f[2]} {f[3]}\n')
 
-    with open(f'results/{filename}', 'w') as f:
+    with open(f'{directory}/{filename}', 'w') as f:
         f.writelines(mtl_lines)
 
 if __name__ == "__main__":

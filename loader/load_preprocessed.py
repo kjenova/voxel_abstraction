@@ -1,14 +1,12 @@
-import torch
 from scipy.io import loadmat
 import glob
 from os import path
-from load_shapes import VolumeFaces
 
 class PreprocessedShape:
     def __init__(self, mat):
         self.resized_volume = mat['Volume']
         self.shape_points = mat['surfaceSamples']
-        self.closest_points = torch.from_numpy(mat['closestPoints'])
+        self.closest_points = mat['closestPoints']
         self.vertices = mat['vertices']
         self.faces = mat['faces']
 
