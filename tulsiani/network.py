@@ -17,7 +17,7 @@ class TulsianiNetwork(nn.Module):
     def __init__(self, params):
         super().__init__()
 
-        n_encoder_layers = np.around(np.log2(grid_size)).astype(int)
+        n_encoder_layers = np.around(np.log2(params.grid_size)).astype(int)
         self.encoder = VolumeEncoder(n_encoder_layers, 4, 1, params.use_batch_normalization_conv)
         n = self.encoder.n_out_channels
 

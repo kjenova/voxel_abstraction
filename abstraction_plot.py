@@ -3,36 +3,25 @@ import numpy as np
 from trimesh import Trimesh
 from PIL import Image
 import pyvista as pv
-from train import Network, PhaseParams
-from load_urocell import load_urocell_preprocessed
-from generate_mesh import predictions_to_mesh
-from bruteforce_view import bruteforce_view
-from write_mesh import cuboid_faces
-from colors import colors
 
-model = Network(PhaseParams(1))
-model.load_state_dict(torch.load('save.torch'))
-model.eval()
+from tulsiani.inference import inference
+
+from loader.load_preprocessed import load_preprocessed
+from loader.load_urocell import load_urocell_preprocessed
+
+from mesh_utils.generate_mesh import predictions_to_mesh_vertices
+from mesh_utils.write_mesh import cuboid_faces
+from render_utils.bruteforce_view import bruteforce_view
+from render_utils.colors import colors
 
 prob_threshold = .5
 remove_redundant = False # TODO
-
-basedir = 'data/chamferData/urocell'
-_, test = load_urocell_preprocessed(basedir)
-
-volume_batch = torch.stack([torch.Tensor(shape.resized_volume) for shape in test])
-with torch.no_grad():
-    P = model(volume_batch, PhaseParams(1))
-    predictions_vertices = predictions_to_mesh(P).cpu()
 
 n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
 shape_image_size = 512
 plot_image_height = 2 * shape_image_size
 plot_image_width = 5 * shape_image_size
 plot_image_size = [plot_image_width, plot_image_height]
-
-images = []
-p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 
 def prediction_vertices_to_mesh(vertices):
     p = vertices.shape[0]
@@ -48,10 +37,17 @@ def prediction_vertices_to_mesh(vertices):
     mesh["colors"] = c
     return mesh
 
+_, test = load_urocell_preprocessed(params.urocell_dir)
+
+images = []
+p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
+
+X = inference(test)[0]
+predictions_vertices = predictions_to_mesh_vertices(X)
 for i in range(10):
     volume_mesh = pv.wrap(Trimesh(test[i].vertices, test[i].faces - 1))
 
-    v = predictions_vertices[i, P.prob[i].cpu() > prob_threshold].numpy()
+    v = predictions_vertices[i, X.prob[i].cpu() > prob_threshold].numpy()
     predictions_mesh = prediction_vertices_to_mesh(v)
 
     volume_actor = p.add_mesh(volume_mesh, opacity = .5)
@@ -69,4 +65,4 @@ for i in range(2):
         image = images[i * 5 + j]
         plot.paste(image, box = (j * shape_image_size, i * shape_image_size))
 
-plot.save('abstraction_tulsiani.png')
+plot.save('results/tulsiani/abstraction_tulsiani.png')

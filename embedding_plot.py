@@ -3,19 +3,28 @@ from trimesh import Trimesh
 from PIL import Image
 import pyvista as pv
 from sklearn.manifold import TSNE
-from load_shapenet import load_shapenet, ShapeNetShape
-from bruteforce_view import bruteforce_view
 
-max_n_examples = 500
-shape_parameters = np.load('shape_parameters.npy')[:max_n_examples]
-n = shape_parameters.shape[0]
-
-shapenet_dir = 'shapenet/chamferData/00'
-dataset = load_shapenet(shapenet_dir, n)
+from loader.load_urocell import load_urocell_preprocessed
+from render_utils.bruteforce_view import bruteforce_view
 
 n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
 shape_image_size = 256
 plot_image_size = 16384
+
+validation, test = load_urocell_preprocessed(params.urocell_dir)
+dataset = validation + test
+n = len(dataset)
+
+shape_parameters = np.zeros((n, params.n_primitives, 10))
+result_batches = inference(dataset)
+
+k = 0
+for batch in result_batches:
+    m = batch.dims.size(0)
+
+    shape_parameters[k : k + m, :, :3] = batch.dims.cpu().numpy()
+    shape_parameters[k : k + m, :, 3:7] = batch.quat.cpu().numpy()
+    shape_parameters[k : k + m, :, 7:] = batch.trans.cpu().numpy()
 
 images = []
 p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
