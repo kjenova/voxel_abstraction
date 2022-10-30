@@ -1,10 +1,12 @@
 import torch
 import numpy as np
+import os
 
 from tulsiani.parameters import params
 from tulsiani.network import TulsianiNetwork
 from tulsiani.net_utils import scale_weights
 from tulsiani.reinforce import ReinforceRewardUpdater
+from tulsiani.batch_provider import BatchProvider
 from tulsiani.stats import TulsianiStats
 
 from common.cuboid import CuboidSurface
@@ -89,7 +91,10 @@ def train(network, train_batches, validation_batches, params, stats):
             print(f'    validation loss: {validation_loss}')
             print(f'    best validation loss: {best_validation_loss}')
 
-os.makedirs('results/tulsiani/graphs')
+try:
+    os.makedirs('results/tulsiani/graphs')
+except FileExistsError:
+    pass
 
 train_set = load_preprocessed(params.train_dir)
 
@@ -100,7 +105,7 @@ validation_set, _ = load_urocell_preprocessed(params.urocell_dir)
 train_batches = BatchProvider(train_set, params, store_on_gpu = False)
 validation_batches = BatchProvider(validation_set, params, store_on_gpu = False)
 
-stats = TulsianiStats()
+stats = TulsianiStats(params)
 
 params.phase = 0
 network = TulsianiNetwork(params)
