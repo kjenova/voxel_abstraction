@@ -12,10 +12,11 @@ def inference(dataset):
     model.eval()
 
     results = []
-    for start in range(0, len(dataset), params.batch_size):
-        batch = torch.stack(
-            [torch.Tensor(s.resized_volume) for s in dataset[start : start + params.batch_size]
-        )
-        results.append(model(batch, params))
+    with torch.no_grad():
+        for start in range(0, len(dataset), params.batch_size):
+            batch = torch.stack(
+                [torch.Tensor(s.resized_volume) for s in dataset[start : start + params.batch_size]]
+            )
+            results.append(model(batch))
 
     return results

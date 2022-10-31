@@ -1,7 +1,8 @@
 import numpy as np
 import trimesh
 from trimesh import Trimesh
-from colors import colors
+
+from .colors import colors
 
 def write_helper(vertices, faces, filename):
     # xyz => xzy

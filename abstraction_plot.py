@@ -9,10 +9,12 @@ from tulsiani.inference import inference
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
 
-from mesh_utils.generate_mesh import predictions_to_mesh_vertices
-from mesh_utils.write_mesh import cuboid_faces
-from render_utils.bruteforce_view import bruteforce_view
-from render_utils.colors import colors
+from common.transform import predictions_to_mesh_vertices
+from graphics.write_mesh import cuboid_faces
+from graphics.bruteforce_view import bruteforce_view
+from graphics.colors import colors
+
+from tulsiani.parameters import params
 
 prob_threshold = .5
 remove_redundant = False # TODO

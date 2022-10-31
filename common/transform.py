@@ -13,6 +13,23 @@ def world_to_primitive_space(points, quat, trans):
     points = points - prepare_trans(trans, points)
     return quat_inverse_rotate(points, quat)
 
+def predictions_to_mesh_vertices(P):
+    [b, p] = P.dims.size()[:2]
+    vertices = torch.zeros(b, p, 8, 3, device = P.dims.device)
+
+    dims = P.dims.view(b, p, 1, 3).repeat(1, 1, 4, 1)
+
+    vertices[..., [0, 1, 4, 5], 0] = dims[..., 0]
+    vertices[..., [2, 3, 6, 7], 0] = - dims[..., 0]
+
+    vertices[..., ::2, 1] = dims[..., 1]
+    vertices[..., 1::2, 1] = - dims[..., 1]
+
+    vertices[..., :4, 2] = dims[..., 2]
+    vertices[..., 4:, 2] = - dims[..., 2]
+
+    return primitive_to_world_space(vertices, P.quat, P.trans)
+
 if __name__ == "__main__":
     import numpy as np
     from quat_utils import get_random_quat
