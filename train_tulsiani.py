@@ -27,18 +27,18 @@ def train(network, train_batches, validation_batches, params, stats):
         optimizer.zero_grad()
 
         (volume, sampled_points, closest_points) = train_batches.get()
-        P = network(volume, params)
+        P = network(volume)
         cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params)
         loss = cov + cons
 
         total_penalty = .0
 
-        if prune_primitives:
+        if params.prune_primitives:
             # Pri nas se minimizira 'penalty', čeprav se pri REINFORCE tipično maksimizira 'reward'.
             # Edina razlika je v tem, da bi v primeru, da bi maksimizirali 'reward = - penalty', morali
             # potem še pri gradientu dodati minus.
-            for p in range(n_primitives):
-                penalty = loss + params.existence_penalty[params.phase] * P.exist[:, p]
+            for p in range(params.n_primitives):
+                penalty = loss + params.existence_penalty * P.exist[:, p]
                 total_penalty += penalty.mean().item()
                 P.log_prob[:, p] *= reinforce_updater.update(penalty)
 
@@ -53,14 +53,14 @@ def train(network, train_batches, validation_batches, params, stats):
         stats.cov[i] = cov.mean()
         stats.cons[i] = cons.mean()
         stats.prob_means[i] = P.prob.mean()
-        stats.penalty_means[i] = total_penalty / n_primitives
+        stats.penalty_means[i] = total_penalty / params.n_primitives
         i += 1
 
         if i % params.save_iteration == 0:
-            cov_mean = stats.cov[i - save_iteration : i].mean()
-            cons_mean = stats.cons[i - save_iteration : i].mean()
-            mean_prob = stats.prob_means[i - save_iteration : i].mean()
-            mean_penalty = stats.penalty_means[i - save_iteration : i].mean()
+            cov_mean = stats.cov[i - params.save_iteration : i].mean()
+            cons_mean = stats.cons[i - params.save_iteration : i].mean()
+            mean_prob = stats.prob_means[i - params.save_iteration : i].mean()
+            mean_penalty = stats.penalty_means[i - params.save_iteration : i].mean()
 
             print(f'---- iteration {i} ----')
             print(f'    loss {cov_mean + cons_mean}, cov: {cov_mean}, cons: {cons_mean}')
@@ -73,7 +73,7 @@ def train(network, train_batches, validation_batches, params, stats):
 
             with torch.no_grad():
                 for (volume, sampled_points, closest_points) in validation_batches.get_all_batches():
-                    P = network(volume, params)
+                    P = network(volume)
                     cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params)
                     validation_loss += (cov + cons).sum()
 

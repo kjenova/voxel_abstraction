@@ -1,17 +1,9 @@
 import torch.nn as nn
+import numpy as np
 
-from volume_encoder import VolumeEncoder
-from net_utils import weights_init
-from primitives import PrimitivesPrediction
-
-class TulsianiParams:
-    @property
-    def dims_factor(self):
-        return self.dims_factors[self.phase]
-
-    @property
-    def prob_factor(self):
-        return self.prob_factors[self.phase]
+from .volume_encoder import VolumeEncoder
+from .net_utils import weights_init
+from .primitives import PrimitivesPrediction
 
 class TulsianiNetwork(nn.Module):
     def __init__(self, params):
@@ -35,7 +27,7 @@ class TulsianiNetwork(nn.Module):
             layers.append(nn.LeakyReLU(0.2, inplace = True))
 
         self.fc_layers = nn.Sequential(*layers)
-        self.primitives = PrimitivesPrediction(n, n_primitives, params)
+        self.primitives = PrimitivesPrediction(n, params)
 
     def forward(self, volume):
         x = self.encoder(volume.unsqueeze(1))

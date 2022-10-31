@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.bernoulli import Bernoulli
 
-from net_utils import weights_init
+from .net_utils import weights_init
 
 class ParameterPrediction(nn.Module):
     def __init__(self, n_input_channels, n_primitives, n_out_features, bias_init = None, nonlinearity = None, default_weights = False):
@@ -41,23 +41,23 @@ class Primitives:
         self.log_prob = log_prob
 
 class PrimitivesPrediction(nn.Module):
-    def __init__(self, n_input_channels, n_primitives, params):
+    def __init__(self, n_input_channels, params):
         super().__init__()
 
-        self.n_primitives = n_primitives
+        self.n_primitives = params.n_primitives
         self.prune_primitives = params.prune_primitives
         self.dims_factor = params.dims_factor
         self.prob_factor = params.prob_factor
 
         dims_bias = torch.Tensor([-3] * 3) / params.dims_factor
-        self.dims = ParameterPrediction(n_input_channels, n_primitives, 3, dims_bias, nn.Sigmoid())
-        self.quat = ParameterPrediction(n_input_channels, n_primitives, 4, [1, 0, 0, 0])
-        self.trans = ParameterPrediction(n_input_channels, n_primitives, 3, nonlinearity = nn.Tanh(), default_weights = True)
-        self.prob = ParameterPrediction(n_input_channels, n_primitives, 1, nonlinearity = nn.Sigmoid())
+        self.dims = ParameterPrediction(n_input_channels, self.n_primitives, 3, dims_bias, nn.Sigmoid())
+        self.quat = ParameterPrediction(n_input_channels, self.n_primitives, 4, [1, 0, 0, 0])
+        self.trans = ParameterPrediction(n_input_channels, self.n_primitives, 3, nonlinearity = nn.Tanh(), default_weights = True)
+        self.prob = ParameterPrediction(n_input_channels, self.n_primitives, 1, nonlinearity = nn.Sigmoid())
 
         # Odmike pri 'prob' inicializiramo tako, da bo verjetnost prisotnosti prvega kvadra
         # pri features = 0 na začetku ~0,9, verjetnosti prisotnosti ostalih pa 0,5.
-        probs_bias = torch.zeros(n_primitives)
+        probs_bias = torch.zeros(self.n_primitives)
         probs_bias[0] = 2.5 / params.prob_factor
         self.prob.layer.bias.data = probs_bias
 

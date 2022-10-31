@@ -1,7 +1,8 @@
 import nibabel
 from skimage import measure
-from load_shapes import resize_volume, VolumeFaces, closest_points_grid
-from load_preprocessed import load_preprocessed
+
+from .load_shapes import resize_volume, VolumeFaces, closest_points_grid
+from .load_preprocessed import load_preprocessed
 
 test_data = [
     ('fib1-1-0-3.nii.gz', [[0], [1, 2]]),

@@ -9,6 +9,10 @@ class TulsianiParams:
     def prob_factor(self):
         return self.prob_factors[self.phase]
 
+    @property
+    def existence_penalty(self):
+        return self.existence_penalties[self.phase]
+
 params = TulsianiParams()
 
 params.train_dir = 'data/chamferData/01'

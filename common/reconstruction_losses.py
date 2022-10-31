@@ -1,7 +1,8 @@
 import torch
 import torch.nn.functional as F
-from transform import world_to_primitive_space, primitive_to_world_space
-from cuboid import CuboidSurface
+
+from .transform import world_to_primitive_space, primitive_to_world_space
+from .cuboid import CuboidSurface
 
 def coverage(P, sampled_points):
     [b, p] = P.dims.size()[:2]

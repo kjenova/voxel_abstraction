@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 def sample_points(all_points, n_samples_per_shape):
     [b, n] = all_points.size()[:2]
@@ -10,6 +11,7 @@ class BatchProvider:
     def __init__(self, shapes, params, test = False, store_on_gpu = True):
         self.repeat_batch_n_iterations = params.repeat_batch_n_iterations
         self.n_samples_per_shape = params.n_samples_per_shape
+        self.batch_size = params.batch_size
 
         self.batch_device = params.device
         self.store_device = self.batch_device if store_on_gpu else torch.device('cpu')
@@ -29,7 +31,7 @@ class BatchProvider:
             self.iteration = 0
 
     def load_batch(self):
-        indices = torch.randint(0, self.n, (min(batch_size, self.n),), device = self.store_device)
+        indices = torch.randint(0, self.n, (min(self.batch_size, self.n),), device = self.store_device)
         # Če je store_on_gpu = False, na GPU pošljemo samo batche, drugače pa so že celotni tenzorji tam.
         self.loaded_volume = self.volume[indices].to(self.batch_device)
         self.loaded_shape_points = self.shape_points[indices].to(self.batch_device)
@@ -45,8 +47,8 @@ class BatchProvider:
         return (self.loaded_volume, sampled_points, self.loaded_closest_points)
 
     def get_all_batches(self):
-        for i in range(0, self.n, batch_size):
-            m = min(batch_size, self.n - i)
+        for i in range(0, self.n, self.batch_size):
+            m = min(self.batch_size, self.n - i)
             sampled_points = sample_points(
                 self.shape_points[i : i + m],
                 self.n_samples_per_shape

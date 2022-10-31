@@ -1,5 +1,5 @@
 import torch
-from quat_utils import quat_rotate, quat_inverse_rotate
+from .quat_utils import quat_rotate, quat_inverse_rotate
 
 def prepare_trans(trans, points):
     return trans.unsqueeze(2).repeat(1, 1, points.size(2), 1)

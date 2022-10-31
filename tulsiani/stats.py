@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-class Stats:
+class TulsianiStats:
     def __init__(self, params):
         self.n = sum(params.n_iterations)
         self.cov = np.zeros(self.n)
