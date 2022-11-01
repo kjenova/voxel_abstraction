@@ -77,7 +77,7 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara):
         out_dict_1['scale'],
         out_dict_1['rotate_quat'],
         out_dict_1['trans'],
-        # !!!
+        out_dict_1['exist']
     )
 
     cov, cons = reconstruction_loss(
