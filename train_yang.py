@@ -146,16 +146,14 @@ def main(args):
     # Training Processing
     best_eval_loss = 100000
     color = utils_pt.generate_ncolors(hypara['N']['N_num_cubes'])
-    num_batch = len(train_dataset) / hypara['L']['L_batch_size']
+    num_batch = len(train_set) / hypara['L']['L_batch_size']
     batch_count = 0
     for epoch in range(hypara['L']['L_epochs']):
         for i, data in enumerate(train_batches.get_all_batches(shuffle = True)):
-            volume, points, closest_points, normals = data
-
             optimizer.zero_grad()
 
             outdict = Network(pc = data[1])
-            loss, loss_dict = loss_func(points, normals, outdict, None, hypara)
+            loss, loss_dict = compute_loss(loss_func, data, outdict, None, hypara)
 
             loss.backward()
             optimizer.step()
@@ -176,7 +174,7 @@ def main(args):
                 utils_pt.train_summaries(summary_writer, loss_dict, batch_count * hypara['L']['L_batch_size'])
                 best_eval_loss = validate(
                     hypara,
-                    val_dataloader,
+                    validation_batches,
                     Network,
                     loss_func,
                     hypara['W'],
@@ -197,7 +195,7 @@ def validate(hypara, validation_batches, Network, loss_func, loss_weight, save_p
             volume, points, closest_points, normals = data
 
             outdict = Network(pc = points)
-            _, cur_loss_dict = loss_func(points, normals, outdict, None, hypara)
+            _, cur_loss_dict = compute_loss(loss_func, data, outdict, None, hypara)
             if j == 0:
                 save_points = points
                 save_dict = outdict
@@ -236,7 +234,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # Experiment(E) hyper-parameters
-    parser.add_argument('--E_name', default ='EXP_1', type = str, help = 'Experiment name')
+    parser.add_argument('--E_name', default = 'EXP_1', type = str, help = 'Experiment name')
     parser.add_argument('--E_freq_val_epoch', default = 1, type = float, help = 'Frequency of validation')
     parser.add_argument('--E_freq_print_iter', default = 10, type = int, help = 'Frequency of print')
     parser.add_argument('--E_CUDA', default = 1, type = int, help = 'Index of CUDA')
@@ -249,7 +247,7 @@ if __name__ == '__main__':
     parser.add_argument('--L_adam_beta1', default = 0.9, type = float, help = 'Adam beta1')
     parser.add_argument('--L_batch_size', default = 32, type = int, help = 'Batch size')
     parser.add_argument('--L_epochs', default = 1000, type = int, help = 'Number of epochs')
-    parser.add_argument('--L_sample_points', action=argparse.BooleanOptionalAction)
+    parser.add_argument('--L_sample_points', default = True, action = 'store_true')
     parser.add_argument('--L_n_samples_per_shape', default = 1000, type = int)
 
     # Network(N) hyper-parameters`
@@ -263,7 +261,7 @@ if __name__ == '__main__':
     # Weight(W) hyper-parameters of losses
     # Če je ta flag nastavljen, se za reconstruction loss uporablja loss iz Tulsiani in sod., drugače
     # pa loss iz Yang in Chen (ki upošteva ujemanje normalnih vektorjev s ploskvami).
-    parser.add_argument('--W_euclidean_dual_loss', action=argparse.BooleanOptionalAction)
+    parser.add_argument('--W_euclidean_dual_loss', action = 'store_true')
     # Se uporablja za reconstruction loss iz Tulsiani in sod.:
     parser.add_argument('--W_n_samples_per_primitive', default = 150, type = int)
     parser.add_argument('--W_REC', default = 1.00, type = float, help = 'REC loss weight')
