@@ -47,9 +47,9 @@ def consistency(volume, P, sampler, closest_points_grid):
     distance, weights = _consistency(volume, P, sampler, closest_points_grid)
     return (distance * weights).sum((1, 2))
 
-def reconstruction_loss(volume, primitives, sampled_points, closest_points_grid, params):
+def reconstruction_loss(volume, primitives, sampled_points, closest_points_grid, n_samples_per_primitive):
     cov = coverage(primitives, sampled_points)
-    sampler = CuboidSurface(params.n_samples_per_primitive)
+    sampler = CuboidSurface(n_samples_per_primitive)
     cons = consistency(volume, primitives, sampler, closest_points_grid)
     return cov, cons
 
@@ -101,7 +101,7 @@ if __name__ == "__main__":
                 for k in range(grid_size):
                     trans = torch.Tensor([i, j, k]).reshape(1, 1, 3)
                     trans = (trans + .5) / grid_size - .5
-                    P = Primitives(dims, quat, trans, exist, None, None)
+                    P = Primitives(dims, quat, trans, exist)
 
                     cons, _ = _consistency(volume, P, CuboidSurface(150), closest_points_grid)
                     cons = cons.mean()

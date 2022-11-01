@@ -9,7 +9,7 @@ from tulsiani.reinforce import ReinforceRewardUpdater
 from tulsiani.stats import TulsianiStats
 
 from common.batch_provider import BatchProvider
-from common.reconstruction_losses import reconstruction_loss
+from common.reconstruction_loss import reconstruction_loss
 
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
@@ -26,7 +26,7 @@ def train(network, train_batches, validation_batches, params, stats):
 
         volume, sampled_points, closest_points = train_batches.get()
         P = network(volume)
-        cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params)
+        cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params.n_samples_per_primitive)
         loss = cov + cons
 
         total_penalty = .0

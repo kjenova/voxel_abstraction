@@ -59,32 +59,34 @@ class loss_whole(nn.Module):
         num_cuboids = out_dict_1['scale'].shape[1]
         num_points = pc.shape[1]
 
-        randn_dis = (torch.randn((batch_size,num_points)) * self.std).cuda().detach()
-        pc_sample = pc + randn_dis.unsqueeze(-1).repeat(1,1,3) * normals
-
-        pc_sample_inver = pc_sample.unsqueeze(1).repeat(1,num_cuboids,1,1) - out_dict_1['pc_assign_mean'].unsqueeze(2).repeat(1,1,num_points,1)
-        pc_sample_inver = torch.einsum('abcd,abde->abce', out_dict_1['rotate'].permute(0,1,3,2), pc_sample_inver.permute(0,1,3,2)).permute(0,1,3,2) #B * N * num_points * 3
-
-        planes_scaled = self.cube_planes.repeat(batch_size,num_cuboids,1,1) * out_dict_1['scale'].unsqueeze(2).repeat(1,1,2,1)
-
-        pc_inver = pc.unsqueeze(1).repeat(1,num_cuboids,1,1) - out_dict_1['pc_assign_mean'].unsqueeze(2).repeat(1,1,num_points,1)
-        pc_inver = torch.einsum('abcd,abde->abce', out_dict_1['rotate'].permute(0,1,3,2), pc_inver.permute(0,1,3,2)).permute(0,1,3,2) #B * N * num_points * 3
-
-        normals_inver = normals.unsqueeze(1).repeat(1,num_cuboids,1,1)
-        normals_inver = torch.einsum('abcd,abde->abce', out_dict_1['rotate'].permute(0,1,3,2), normals_inver.permute(0,1,3,2)).permute(0,1,3,2) #B * N * num_points * 3
-
-        mask_project = self.mask_project.repeat(batch_size,num_points,num_cuboids,1)
-        mask_plane = self.mask_plane.repeat(batch_size,num_points,num_cuboids,1)
-        cube_normal = self.cube_normal.unsqueeze(2).repeat(batch_size,num_points,num_cuboids,1,1)
-
-        cos = nn.CosineSimilarity(dim=4, eps=1e-4)
-        idx_normals_sim_max = torch.max(cos(normals_inver.permute(0,2,1,3).unsqueeze(3).repeat(1,1,1,6,1),cube_normal),dim=-1,keepdim=True)[1]
-
         loss_ins = 0
         loss_dict = {}
 
         # Loss REC
-        if hypara['W']['W_REC'] != 0:
+        # Ko je euclidean dual loss = True, tukaj ne izračunamo reconstruction loss-a.
+        if not hypara['W']['W_euclidean_dual_loss'] and hypara['W']['W_REC'] != 0:
+            randn_dis = (torch.randn((batch_size, num_points)) * self.std).cuda().detach()
+            pc_sample = pc + randn_dis.unsqueeze(-1).repeat(1,1,3) * normals
+
+            pc_sample_inver = pc_sample.unsqueeze(1).repeat(1,num_cuboids,1,1) - out_dict_1['pc_assign_mean'].unsqueeze(2).repeat(1,1,num_points,1)
+            pc_sample_inver = torch.einsum('abcd,abde->abce', out_dict_1['rotate'].permute(0,1,3,2), pc_sample_inver.permute(0,1,3,2)).permute(0,1,3,2) #B * N * num_points * 3
+
+            planes_scaled = self.cube_planes.repeat(batch_size,num_cuboids,1,1) * out_dict_1['scale'].unsqueeze(2).repeat(1,1,2,1)
+
+            pc_inver = pc.unsqueeze(1).repeat(1,num_cuboids,1,1) - out_dict_1['pc_assign_mean'].unsqueeze(2).repeat(1,1,num_points,1)
+            pc_inver = torch.einsum('abcd,abde->abce', out_dict_1['rotate'].permute(0,1,3,2), pc_inver.permute(0,1,3,2)).permute(0,1,3,2) #B * N * num_points * 3
+
+            normals_inver = normals.unsqueeze(1).repeat(1,num_cuboids,1,1)
+            normals_inver = torch.einsum('abcd,abde->abce', out_dict_1['rotate'].permute(0,1,3,2), normals_inver.permute(0,1,3,2)).permute(0,1,3,2) #B * N * num_points * 3
+
+            mask_project = self.mask_project.repeat(batch_size,num_points,num_cuboids,1)
+            mask_plane = self.mask_plane.repeat(batch_size,num_points,num_cuboids,1)
+            cube_normal = self.cube_normal.unsqueeze(2).repeat(batch_size,num_points,num_cuboids,1,1)
+
+            cos = nn.CosineSimilarity(dim=4, eps=1e-4)
+            idx_normals_sim_max = torch.max(cos(normals_inver.permute(0,2,1,3).unsqueeze(3).repeat(1,1,1,6,1),cube_normal),dim=-1,keepdim=True)[1]
+
+
             REC = self.compute_REC(idx_normals_sim_max, out_dict_1['assign_matrix'],out_dict_1['scale'],\
                                     pc_inver, pc_sample_inver, planes_scaled, mask_project, mask_plane,\
                                     batch_size, num_points, num_cuboids)
@@ -118,7 +120,7 @@ class loss_whole(nn.Module):
 
         loss_dict['ALL'] = loss_ins.data.detach().item()
 
-        if hypara['W']['W_SPS']  != 0:
+        if hypara['W']['W_SPS'] != 0:
             loss_dict['eval'] = (REC * hypara['W']['W_REC']  + SPS * hypara['W']['W_SPS'] ).data.detach().item()
         else:
             loss_dict['eval'] = (REC * hypara['W']['W_REC']  + 0 * hypara['W']['W_SPS'] ).data.detach().item()

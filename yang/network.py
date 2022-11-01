@@ -150,12 +150,11 @@ class Para_pred(nn.Module):
                                         nn.Conv1d(32, 1, kernel_size=1, bias=True))
 
     def forward(self, x_cuboid):
-
         scale = self.conv_scale(x_cuboid).transpose(2, 1)    # (batch_size, num_cuboid, 3)
         scale = torch.sigmoid(scale)                         # (batch_size, num_cuboid, 3)
         
         rotate = self.conv_rotate(x_cuboid).transpose(2, 1)  # (batch_size, num_cuboid, 4)
-        rotate = quat2mat(F.normalize(rotate,dim=2,p=2))     # (batch_size, num_cuboid, 3, 3)
+        # rotate = quat2mat(F.normalize(rotate,dim=2,p=2))     # (batch_size, num_cuboid, 3, 3)
 
         trans = self.conv_trans(x_cuboid).transpose(2, 1)    # (batch_size, num_cuboid, 3)
         trans = torch.tanh(trans)                            # (batch_size, num_cuboid, 3)
@@ -233,7 +232,8 @@ class Network_Whole(nn.Module):
         # rotate B * N * 3 * 3
         # scale B * N * 3
         x_per, x_cuboid, z, mu, log_var = self.Feature_extract(pc)
-        scale, rotate, trans, exist = self.Para_pred(x_cuboid)
+        scale, rotate_quat, trans, exist = self.Para_pred(x_cuboid)
+        rotate = quat2mat(F.normalize(rotate_quat,dim=2,p=2)) 
         assign_matrix = self.Attention_module(x_per, x_cuboid)
 
         pc_assign = pc.unsqueeze(2).repeat(1,1,self.num_cuboid,1) * assign_matrix.unsqueeze(-1).repeat(1,1,1,3)
@@ -249,6 +249,7 @@ class Network_Whole(nn.Module):
 
         return {'scale':scale,
                 'rotate':rotate,
+                'rotate_quat':rotate_quat,
                 'trans':trans,
                 'pc_assign_mean':pc_assign_mean,
                 'assign_matrix':assign_matrix,

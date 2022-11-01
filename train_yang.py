@@ -14,7 +14,10 @@ from yang.network import Network_Whole
 from yang.losses import loss_whole
 import yang.utils_pytorch as utils_pt
 
+from tulsiani.primitives import Primitives
+
 from common.batch_provider import BatchProvider, BatchProviderParams
+from common.reconstruction_loss import reconstruction_loss
 
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
@@ -58,6 +61,42 @@ def parsing_hyperparas(args):
     summary_writer = SummaryWriter(save_path + '/tensorboard')
 
     return hypara, save_path, summary_writer
+
+# Ko je euclidean dual loss = True, reconstruction loss-a ne računamo po
+# metodi Yang in Chen (ki upošteva normalne vektorje), temveč po "navadni"
+# formuli iz Tulsiani in sod.
+def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara):
+    volume, points, closest_points, normals = data
+
+    loss, loss_dict = loss_func(points, normals, out_dict_1, out_dict_2, hypara)
+
+    if not hypara['W']['W_euclidean_dual_loss']:
+        return loss, loss_dict
+
+    P = Primitives(
+        out_dict_1['scale'],
+        out_dict_1['rotate_quat'],
+        out_dict_1['trans'],
+        # !!!
+    )
+
+    cov, cons = reconstruction_loss(
+        volume,
+        P,
+        points,
+        closest_points,
+        hypara['W']['W_n_samples_per_primitive']
+    )
+
+    r = (cov + cons).mean() * hypara['W']['W_REC']
+    loss_dict['eval'] = (r.data.detach().item() - loss_dict['REC']) * hypara['W']['W_REC']
+    loss_dict['REC'] = r.data.detach().item()
+
+    loss += r * hypara['W']['W_REC']
+
+    loss_dict['ALL'] = loss.data.detach().item()
+
+    return loss, loss_dict
 
 def main(args):
     hypara, save_path, summary_writer = parsing_hyperparas(args)
@@ -115,27 +154,48 @@ def main(args):
 
             optimizer.zero_grad()
 
-            outdict = Network(pc = points)
+            outdict = Network(pc = data[1])
             loss, loss_dict = loss_func(points, normals, outdict, None, hypara)
 
             loss.backward()
             optimizer.step()
 
-            utils_pt.print_text(loss_dict, save_path, is_train = True, epoch = epoch, i = i, num_batch = num_batch, lr = hypara['L']['L_base_lr'], print_freq_iter = hypara['E']['E_freq_print_iter'])
+            utils_pt.print_text(
+                loss_dict,
+                save_path,
+                is_train = True,
+                epoch = epoch,
+                i = i,
+                num_batch = num_batch,
+                lr = hypara['L']['L_base_lr'],
+                print_freq_iter = hypara['E']['E_freq_print_iter']
+            )
             batch_count += 1
 
             if batch_count % int(hypara['E']['E_freq_val_epoch'] * num_batch) == 0:
-                utils_pt.train_summaries(summary_writer,loss_dict,batch_count * hypara['L']['L_batch_size'])
-                best_eval_loss = validate(hypara, val_dataloader, Network, loss_func, hypara['W'], save_path, batch_count, epoch, summary_writer, best_eval_loss, color)
+                utils_pt.train_summaries(summary_writer, loss_dict, batch_count * hypara['L']['L_batch_size'])
+                best_eval_loss = validate(
+                    hypara,
+                    val_dataloader,
+                    Network,
+                    loss_func,
+                    hypara['W'],
+                    save_path,
+                    batch_count,
+                    epoch,
+                    summary_writer,
+                    best_eval_loss,
+                    color
+                )
                 Network.train()
 
-def validate(hypara, val_dataloader, Network, loss_func, loss_weight, save_path, iter, epoch, summary_writer, best_eval_loss, color):
+def validate(hypara, validation_batches, Network, loss_func, loss_weight, save_path, iter, epoch, summary_writer, best_eval_loss, color):
     Network.eval()
     loss_dict = {}
-    for j, data in enumerate(val_dataloader, 0):
+    for j, data in enumerate(validation_batches.get_all_batches(shuffle = False)):
         with torch.no_grad():
-            points, normals, _, _, _ = data
-            points, normals = points.cuda(), normals.cuda()
+            volume, points, closest_points, normals = data
+
             outdict = Network(pc = points)
             _, cur_loss_dict = loss_func(points, normals, outdict, None, hypara)
             if j == 0:
@@ -146,21 +206,25 @@ def validate(hypara, val_dataloader, Network, loss_func, loss_weight, save_path,
                     loss_dict[key] = loss_dict[key] + cur_loss_dict[key]
             else:
                 loss_dict = cur_loss_dict
+
     for key in loss_dict:
         loss_dict[key] = loss_dict[key] / (j+1)
-        
+
     utils_pt.print_text(loss_dict, save_path, is_train = False)
     utils_pt.valid_summaries(summary_writer, loss_dict, iter * hypara['L']['L_batch_size'])
-    if (loss_dict['eval']) < best_eval_loss:
+
+    if loss_dict['eval'] < best_eval_loss:
         best_eval_loss = copy.deepcopy(loss_dict['eval'])
         print('eval: ',best_eval_loss)
         if epoch >= 0:
             model_name = utils_pt.create_name(iter, loss_dict)
-            torch.save(Network.state_dict(), save_path +'/'+ model_name + '.pth')
+            torch.save(Network.state_dict(), save_path + '/' + model_name + '.pth')
+
             vertices, faces = utils_pt.generate_cube_mesh_batch(save_dict['verts_forward'], save_dict['cube_face'], hypara['L']['L_batch_size'])
             utils_pt.visualize_segmentation(save_points, color, save_dict['assign_matrix'], save_path + '/log/', 0, None)
             utils_pt.visualize_cubes(vertices, faces, color, save_path + '/log/', 0, '', None)
             utils_pt.visualize_cubes_masked(vertices, faces, color, save_dict['assign_matrix'], save_path + '/log/', 0, '', None)
+
             vertices_pred, faces_pred = utils_pt.generate_cube_mesh_batch(save_dict['verts_predict'], save_dict['cube_face'], hypara['L']['L_batch_size'])
             utils_pt.visualize_cubes(vertices_pred, faces_pred, color, save_path + '/log/', 0, 'pred', None)
             utils_pt.visualize_cubes_masked(vertices_pred, faces_pred, color, save_dict['assign_matrix'], save_path + '/log/', 0, 'pred', None)
@@ -170,38 +234,44 @@ def validate(hypara, val_dataloader, Network, loss_func, loss_weight, save_path,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+
     # Experiment(E) hyper-parameters
-    parser.add_argument ('--E_name', default ='EXP_1', type = str, help = 'Experiment name')
-    parser.add_argument ('--E_freq_val_epoch', default = 1, type = float, help = 'Frequency of validation')
-    parser.add_argument ('--E_freq_print_iter', default = 10, type = int, help = 'Frequency of print')
-    parser.add_argument ('--E_CUDA', default = 1, type = int, help = 'Index of CUDA')
-    parser.add_argument ('--E_train_dir', default = 'data/chamferData/01', type = str)
-    parser.add_argument ('--E_urocell_dir', default = 'data/chamferData/urocell', type = str)
-    parser.add_argument ('--E_save_dir', default = 'results/yang', type = str)
+    parser.add_argument('--E_name', default ='EXP_1', type = str, help = 'Experiment name')
+    parser.add_argument('--E_freq_val_epoch', default = 1, type = float, help = 'Frequency of validation')
+    parser.add_argument('--E_freq_print_iter', default = 10, type = int, help = 'Frequency of print')
+    parser.add_argument('--E_CUDA', default = 1, type = int, help = 'Index of CUDA')
+    parser.add_argument('--E_train_dir', default = 'data/chamferData/01', type = str)
+    parser.add_argument('--E_urocell_dir', default = 'data/chamferData/urocell', type = str)
+    parser.add_argument('--E_save_dir', default = 'results/yang', type = str)
 
     # Learning(L) hyper-parameters
-    parser.add_argument ('--L_base_lr', default = 6e-4, type = float, help = 'Learning rate')
-    parser.add_argument ('--L_adam_beta1', default = 0.9, type = float, help = 'Adam beta1')
-    parser.add_argument ('--L_batch_size', default = 32, type = int, help = 'Batch size')
-    parser.add_argument ('--L_epochs', default = 1000, type = int, help = 'Number of epochs')
-    parser.add_argument ('--L_sample_points', action=argparse.BooleanOptionalAction)
-    parser.add_argument ('--L_n_samples_per_shape', default = 1000, type = int)
+    parser.add_argument('--L_base_lr', default = 6e-4, type = float, help = 'Learning rate')
+    parser.add_argument('--L_adam_beta1', default = 0.9, type = float, help = 'Adam beta1')
+    parser.add_argument('--L_batch_size', default = 32, type = int, help = 'Batch size')
+    parser.add_argument('--L_epochs', default = 1000, type = int, help = 'Number of epochs')
+    parser.add_argument('--L_sample_points', action=argparse.BooleanOptionalAction)
+    parser.add_argument('--L_n_samples_per_shape', default = 1000, type = int)
 
     # Network(N) hyper-parameters`
-    parser.add_argument ('--N_if_low_dim', default = 0, type = int, help = 'DGCNN paramter: KNN manner')
-    parser.add_argument ('--N_k', default = 20, type = int, help = 'DGCNN paramter: K of KNN')
-    parser.add_argument ('--N_dim_emb', default = 1024, type = int, help = 'Dimension of global feature')
-    parser.add_argument ('--N_dim_z', default = 512, type = int, help = 'Dimension of latent code Z')
-    parser.add_argument ('--N_dim_att', default = 64, type = int, help = 'Dimension of query and key in attention')
-    parser.add_argument ('--N_num_cubes', default = 16, type = int, help = 'Number of cuboids')
+    parser.add_argument('--N_if_low_dim', default = 0, type = int, help = 'DGCNN paramter: KNN manner')
+    parser.add_argument('--N_k', default = 20, type = int, help = 'DGCNN paramter: K of KNN')
+    parser.add_argument('--N_dim_emb', default = 1024, type = int, help = 'Dimension of global feature')
+    parser.add_argument('--N_dim_z', default = 512, type = int, help = 'Dimension of latent code Z')
+    parser.add_argument('--N_dim_att', default = 64, type = int, help = 'Dimension of query and key in attention')
+    parser.add_argument('--N_num_cubes', default = 16, type = int, help = 'Number of cuboids')
 
     # Weight(W) hyper-parameters of losses
-    parser.add_argument ('--W_REC', default = 1.00, type = float, help = 'REC loss weight')
-    parser.add_argument ('--W_std', default = 0.05, type = float, help = 'std of normal sampling')
-    parser.add_argument ('--W_SPS', default = 0.10, type = float, help = 'SPS loss weight')
-    parser.add_argument ('--W_EXT', default = 0.01, type = float, help = 'EXT loss weight')
-    parser.add_argument ('--W_KLD', default = 6e-6, type = float, help = 'KLD loss weight')
-    parser.add_argument ('--W_CST', default = 0.00, type = float, help = 'CST loss weight, this loss is only for generation application')
+    # Če je ta flag nastavljen, se za reconstruction loss uporablja loss iz Tulsiani in sod., drugače
+    # pa loss iz Yang in Chen (ki upošteva ujemanje normalnih vektorjev s ploskvami).
+    parser.add_argument('--W_euclidean_dual_loss', action=argparse.BooleanOptionalAction)
+    # Se uporablja za reconstruction loss iz Tulsiani in sod.:
+    parser.add_argument('--W_n_samples_per_primitive', default = 150, type = int)
+    parser.add_argument('--W_REC', default = 1.00, type = float, help = 'REC loss weight')
+    parser.add_argument('--W_std', default = 0.05, type = float, help = 'std of normal sampling')
+    parser.add_argument('--W_SPS', default = 0.10, type = float, help = 'SPS loss weight')
+    parser.add_argument('--W_EXT', default = 0.01, type = float, help = 'EXT loss weight')
+    parser.add_argument('--W_KLD', default = 6e-6, type = float, help = 'KLD loss weight')
+    parser.add_argument('--W_CST', default = 0.00, type = float, help = 'CST loss weight, this loss is only for generation application')
 
     args = parser.parse_args()
     main(args)

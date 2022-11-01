@@ -32,7 +32,7 @@ class ParameterPrediction(nn.Module):
         return x.view(feature.size(0), self.n_primitives, -1)
 
 class Primitives:
-    def __init__(self, dims, quat, trans, exist, prob, log_prob):
+    def __init__(self, dims, quat, trans, exist, prob = None, log_prob = None):
         self.dims = dims
         self.quat = quat
         self.trans = trans
