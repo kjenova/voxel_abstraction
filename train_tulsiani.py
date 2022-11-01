@@ -6,10 +6,9 @@ from tulsiani.parameters import params
 from tulsiani.network import TulsianiNetwork
 from tulsiani.net_utils import scale_weights
 from tulsiani.reinforce import ReinforceRewardUpdater
-from tulsiani.batch_provider import BatchProvider
 from tulsiani.stats import TulsianiStats
 
-from common.cuboid import CuboidSurface
+from common.batch_provider import BatchProvider
 from common.reconstruction_losses import reconstruction_loss
 
 from loader.load_preprocessed import load_preprocessed
@@ -17,7 +16,6 @@ from loader.load_urocell import load_urocell_preprocessed
 
 def train(network, train_batches, validation_batches, params, stats):
     optimizer = torch.optim.Adam(network.parameters(), lr = params.learning_rate)
-    sampler = CuboidSurface(params.n_samples_per_primitive)
     reinforce_updater = ReinforceRewardUpdater(params.reinforce_baseline_momentum)
 
     best_validation_loss = float('inf')
@@ -26,7 +24,7 @@ def train(network, train_batches, validation_batches, params, stats):
     for _ in range(params.n_iterations[params.phase]):
         optimizer.zero_grad()
 
-        (volume, sampled_points, closest_points) = train_batches.get()
+        volume, sampled_points, closest_points = train_batches.get()
         P = network(volume)
         cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params)
         loss = cov + cons

@@ -10,10 +10,14 @@ import torch.optim.lr_scheduler as lr_sched
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
-from data_loader import shapenet4096
-from network import Network_Whole
-from losses import loss_whole
-import utils_pytorch as utils_pt
+from yang.network import Network_Whole
+from yang.losses import loss_whole
+import yang.utils_pytorch as utils_pt
+
+from common.batch_provider import BatchProvider, BatchProviderParams
+
+from loader.load_preprocessed import load_preprocessed
+from loader.load_urocell import load_urocell_preprocessed
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = False
@@ -30,15 +34,13 @@ def parsing_hyperparas(args):
     # parsing hyper-parameters to dict
     hypara = {}
     hypara['E'] = {}
-    hypara['D'] = {}
     hypara['L'] = {}
     hypara['W'] = {}
     hypara['N'] = {}
     for arg in vars(args):
         hypara[str(arg)[0]][str(arg)] = getattr(args, arg)
     # get the save_path
-    save_path = hypara['E']['E_ckpts_folder'] + hypara['E']['E_name'] + '/'
-    save_path = save_path + str(hypara['D']['D_datatype'])
+    save_path = hypara['E']['E_save_dir'] + '/' + hypara['E']['E_name']
     save_path = save_path + '-L'
     for key in hypara['L']:
         save_path = save_path + '_' + str(hypara['L'][key])
@@ -57,7 +59,6 @@ def parsing_hyperparas(args):
 
     return hypara, save_path, summary_writer
 
-
 def main(args):
     hypara, save_path, summary_writer = parsing_hyperparas(args)
 
@@ -65,53 +66,64 @@ def main(args):
     if 'E_CUDA' in hypara['E']:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(hypara['E']['E_CUDA'])
 
-    # Create Dataset
-    train_dataset = shapenet4096('train', hypara['E']['E_shapenet4096'], hypara['D']['D_datatype'], True)
-    valid_dataset = shapenet4096('valid', hypara['E']['E_shapenet4096'], hypara['D']['D_datatype'], True)
+    train_set = load_preprocessed(hypara['E']['E_train_dir'])
+    validation_set, _ = load_urocell_preprocessed(hypara['E']['E_urocell_dir'])
 
-    # Create dataloader
-    train_dataloader = DataLoader(train_dataset, 
-                                batch_size = hypara['L']['L_batch_size'],
-                                shuffle=True, 
-                                num_workers=int(hypara['E']['E_workers']), 
-                                pin_memory=True)
-    val_dataloader = DataLoader(valid_dataset, 
-                                batch_size = hypara['L']['L_batch_size'],
-                                shuffle=False, 
-                                num_workers=int(hypara['E']['E_workers']), 
-                                pin_memory=True)
-    
+    batch_params = BatchProviderParams(
+        torch.device('cuda'),
+        n_samples_per_shape = hypara['L']['L_n_samples_per_shape'],
+        batch_size = hypara['L']['L_batch_size']
+    )
+
+    train_batches = BatchProvider(
+        train_set,
+        batch_params,
+        store_on_gpu = False,
+        include_normals = True,
+        uses_point_sampling = hypara['L']['L_sample_points']
+    )
+    validation_batches = BatchProvider(
+        validation_set,
+        batch_params,
+        store_on_gpu = False,
+        include_normals = True,
+        uses_point_sampling = hypara['L']['L_sample_points']
+    )
+
     # Create Model
     Network = Network_Whole(hypara).cuda()
     Network.train()
-
-    # Load Model if checkpoint is not none
-    if hypara['E']['E_ckpt_path'] != '':
-        Network.load_state_dict(torch.load(hypara['E']['E_ckpt_path']))
-        print('Load model successfully: %s' % (hypara['E']['E_ckpt_path']))
 
     # Create Loss Function
     loss_func = loss_whole(hypara).cuda()
 
     # Create Optimizer
-    optimizer = optim.Adam(Network.parameters(), lr = hypara['L']['L_base_lr'], betas = (hypara['L']['L_adam_beta1'], 0.999))
-    
+    optimizer = optim.Adam(
+        Network.parameters(),
+        lr = hypara['L']['L_base_lr'],
+        betas = (hypara['L']['L_adam_beta1'], 0.999)
+    )
+
     # Training Processing
     best_eval_loss = 100000
     color = utils_pt.generate_ncolors(hypara['N']['N_num_cubes'])
-    num_batch = len(train_dataset)/hypara['L']['L_batch_size']
+    num_batch = len(train_dataset) / hypara['L']['L_batch_size']
     batch_count = 0
     for epoch in range(hypara['L']['L_epochs']):
-        for i, data in enumerate(train_dataloader, 0):
-            points, normals, _, _, _ = data
-            points, normals = points.cuda(), normals.cuda()
+        for i, data in enumerate(train_batches.get_all_batches(shuffle = True)):
+            volume, points, closest_points, normals = data
+
             optimizer.zero_grad()
+
             outdict = Network(pc = points)
             loss, loss_dict = loss_func(points, normals, outdict, None, hypara)
+
             loss.backward()
             optimizer.step()
+
             utils_pt.print_text(loss_dict, save_path, is_train = True, epoch = epoch, i = i, num_batch = num_batch, lr = hypara['L']['L_base_lr'], print_freq_iter = hypara['E']['E_freq_print_iter'])
             batch_count += 1
+
             if batch_count % int(hypara['E']['E_freq_val_epoch'] * num_batch) == 0:
                 utils_pt.train_summaries(summary_writer,loss_dict,batch_count * hypara['L']['L_batch_size'])
                 best_eval_loss = validate(hypara, val_dataloader, Network, loss_func, hypara['W'], save_path, batch_count, epoch, summary_writer, best_eval_loss, color)
@@ -156,26 +168,24 @@ def validate(hypara, val_dataloader, Network, loss_func, loss_weight, save_path,
     
     return best_eval_loss
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # Experiment(E) hyper-parameters
     parser.add_argument ('--E_name', default ='EXP_1', type = str, help = 'Experiment name')
-    parser.add_argument ('--E_workers', default = 4, type = int, help = 'Number of workers')
     parser.add_argument ('--E_freq_val_epoch', default = 1, type = float, help = 'Frequency of validation')
     parser.add_argument ('--E_freq_print_iter', default = 10, type = int, help = 'Frequency of print')
-    parser.add_argument ('--E_CUDA', default = 0, type = int, help = 'Index of CUDA')
-    parser.add_argument ('--E_shapenet4096', default = '', type = str, help = 'Path to ShapeNet4096 dataset')
-    parser.add_argument ('--E_ckpts_folder', default ='', type = str, help = 'Save path')
-    parser.add_argument ('--E_ckpt_path', default ='', type = str, help = '(Optional) Path to checkpoint to load')
-    
-    # Dataset(D) hyper-parameters
-    parser.add_argument ('--D_datatype', default = 'chair', type = str, help = 'airplane, chair, table or animal')
-    
+    parser.add_argument ('--E_CUDA', default = 1, type = int, help = 'Index of CUDA')
+    parser.add_argument ('--E_train_dir', default = 'data/chamferData/01', type = str)
+    parser.add_argument ('--E_urocell_dir', default = 'data/chamferData/urocell', type = str)
+    parser.add_argument ('--E_save_dir', default = 'results/yang', type = str)
+
     # Learning(L) hyper-parameters
     parser.add_argument ('--L_base_lr', default = 6e-4, type = float, help = 'Learning rate')
     parser.add_argument ('--L_adam_beta1', default = 0.9, type = float, help = 'Adam beta1')
     parser.add_argument ('--L_batch_size', default = 32, type = int, help = 'Batch size')
     parser.add_argument ('--L_epochs', default = 1000, type = int, help = 'Number of epochs')
+    parser.add_argument ('--L_sample_points', action=argparse.BooleanOptionalAction)
+    parser.add_argument ('--L_n_samples_per_shape', default = 1000, type = int)
 
     # Network(N) hyper-parameters`
     parser.add_argument ('--N_if_low_dim', default = 0, type = int, help = 'DGCNN paramter: KNN manner')
@@ -192,6 +202,6 @@ if __name__ == "__main__":
     parser.add_argument ('--W_EXT', default = 0.01, type = float, help = 'EXT loss weight')
     parser.add_argument ('--W_KLD', default = 6e-6, type = float, help = 'KLD loss weight')
     parser.add_argument ('--W_CST', default = 0.00, type = float, help = 'CST loss weight, this loss is only for generation application')
-    
+
     args = parser.parse_args()
     main(args)

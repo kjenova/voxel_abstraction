@@ -1,17 +1,29 @@
 import torch
 import numpy as np
 
-def sample_points(all_points, n_samples_per_shape):
-    [b, n] = all_points.size()[:2]
-    i = torch.randint(0, n, (b, n_samples_per_shape), device = all_points.device)
-    i += n * torch.arange(0, b, device = all_points.device).reshape(-1, 1)
-    return all_points.reshape(-1, 3)[i]
-
-class BatchProvider:
-    def __init__(self, shapes, params, test = False, store_on_gpu = True):
+class BatchProviderParams:
+    def __init__(self, device, repeat_batch_n_iterations = 1, n_samples_per_shape = 1000, batch_size = 32):
+        self.device = device
         self.repeat_batch_n_iterations = params.repeat_batch_n_iterations
         self.n_samples_per_shape = params.n_samples_per_shape
         self.batch_size = params.batch_size
+
+class BatchProvider:
+    def __init__(
+        self,
+        shapes,
+        params,
+        test = False,
+        store_on_gpu = True,
+        include_normals = False,
+        uses_point_sampling = True
+    ):
+        self.repeat_batch_n_iterations = params.repeat_batch_n_iterations
+        self.n_samples_per_shape = params.n_samples_per_shape
+        self.batch_size = params.batch_size
+
+        self.include_normals = include_normals
+        self.uses_point_sampling = uses_point_sampling
 
         self.batch_device = params.device
         self.store_device = self.batch_device if store_on_gpu else torch.device('cpu')
@@ -28,6 +40,12 @@ class BatchProvider:
             self.closest_points = torch.stack(
                 [torch.from_numpy(s.closest_points) for s in shapes]
             ).to(self.store_device)
+
+            if include_normals:
+                self.normals = torch.stack(
+                    [torch.from_numpy(s.normals) for s in shapes]
+                ).to(self.store_device)
+
             self.iteration = 0
 
     def load_batch(self):
@@ -37,24 +55,42 @@ class BatchProvider:
         self.loaded_shape_points = self.shape_points[indices].to(self.batch_device)
         self.loaded_closest_points = self.closest_points[indices].to(self.batch_device)
 
+    def sample_points(all_points):
+        if not self.uses_point_sampling:
+            return all_points
+
+        [b, n] = all_points.size()[:2]
+        i = torch.randint(0, n, (b, self.n_samples_per_shape), device = all_points.device)
+        i += n * torch.arange(0, b, device = all_points.device).reshape(-1, 1)
+        return all_points.reshape(-1, 3)[i]
+
     def get(self):
         if self.iteration % self.repeat_batch_n_iterations == 0:
             self.load_batch()
 
         self.iteration += 1
 
-        sampled_points = sample_points(self.loaded_shape_points, self.n_samples_per_shape)
+        sampled_points = self.sample_points(self.loaded_shape_points)
         return (self.loaded_volume, sampled_points, self.loaded_closest_points)
 
-    def get_all_batches(self):
+    def get_all_batches(self, shuffle = False):
+        indices = torch.randperm(self.n) if shuffle else torch.arange(self.n)
+
         for i in range(0, self.n, self.batch_size):
             m = min(self.batch_size, self.n - i)
-            sampled_points = sample_points(
-                self.shape_points[i : i + m],
-                self.n_samples_per_shape
+            ind = indices[i : i + m]
+
+            sampled_points = self.sample_points(
+                self.shape_points[ind],
             ).to(self.batch_device)
-            yield (
-                self.volume[i : i + m].to(self.batch_device),
+
+            result = (
+                self.volume[ind].to(self.batch_device),
                 sampled_points,
-                self.closest_points[i : i + m].to(self.batch_device)
+                self.closest_points[ind].to(self.batch_device)
             )
+
+            if self.include_normals:
+                x += self.normals[ind],
+
+            yield result

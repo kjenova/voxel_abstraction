@@ -10,6 +10,9 @@ class PreprocessedShape:
         self.vertices = mat['vertices']
         self.faces = mat['faces']
 
+        if 'normals' in mat:
+            self.normals = mat['normals']
+
 def load_preprocessed(directory, max_n_shapes = 1000000):
     shapes = []
     filenames = glob.glob(f'{directory}/*.mat')[:max_n_shapes]
