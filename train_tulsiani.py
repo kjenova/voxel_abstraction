@@ -116,7 +116,7 @@ train(network, train_batches, validation_batches, params, stats)
 params.phase = 1
 network = TulsianiNetwork(params)
 network.load_state_dict(torch.load('results/tulsiani/save.torch'))
-scale_weights(network)
+scale_weights(network, params)
 network.to(params.device)
 
 train(network, train_batches, validation_batches, params, stats)

@@ -50,7 +50,6 @@ function helper2(filename, V, label, tsdfDir)
         standardizedVertices = normalizedVertices - 0.5;
 
         surfaceSamples = uniform_sampling(FV.faces, standardizedVertices, numSamples);
-        surfaceSamples = surfaceSamples';
 
         maxSize = max(size(cropped));
         Volume = imresize3(cropped, gridSize / maxSize);
@@ -72,19 +71,19 @@ function helper2(filename, V, label, tsdfDir)
         closestPointsGrid = reshape(closestPoints, [size(Xp), 3]);
 
         tsdfFile = fullfile(tsdfDir, filename, num2str(label), strcat(num2str(i), '.mat'));
-        savefunc(tsdfFile, tsdfGrid, Volume, closestPointsGrid, surfaceSamples, standardizedVertices, FV.faces);
+        savefunc(tsdfFile, tsdfGrid, Volume, closestPointsGrid, surfaceSamples(:, 1:3), standardizedVertices, FV.faces, surfaceSamples(:, 4:6));
         pBar.progress();
     end
 
     pBar.stop();
 end
 
-function savefunc(tsdfFile, tsdf, Volume, closestPoints, surfaceSamples, vertices, faces)
-    save(tsdfFile, 'tsdf', 'Volume', 'closestPoints', 'surfaceSamples', 'vertices', 'faces');
+function savefunc(tsdfFile, tsdf, Volume, closestPoints, surfaceSamples, vertices, faces, normals)
+    save(tsdfFile, 'tsdf', 'Volume', 'closestPoints', 'surfaceSamples', 'vertices', 'faces', 'normals');
 end
 
 function [samples] = uniform_sampling(faces, vertices, numSamples)
-    samples = zeros(3, numSamples);
+    samples = zeros(numSamples, 6);
     faceIds = datasample(1:size(faces, 1), numSamples);
     paras = rand(2, numSamples);
 
@@ -99,6 +98,9 @@ function [samples] = uniform_sampling(faces, vertices, numSamples)
         t1 = 1-sqrt(r1);
         t2 = sqrt(r1)*(1-r2);
         t3 = sqrt(r1)*r2;
-        samples(:, sId) = t1*p1 + t2*p2 + t3*p3;
+        samples(sId, 1:3) = t1*p1 + t2*p2 + t3*p3;
+
+        c = cross(p2 - p1, p3 - p1);
+        samples(sId, 4:6) = c / norm(c);
     end
 end
