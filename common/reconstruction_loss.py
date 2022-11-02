@@ -4,13 +4,17 @@ import torch.nn.functional as F
 from .transform import world_to_primitive_space, primitive_to_world_space
 from .cuboid import CuboidSurface
 
-def coverage(P, sampled_points):
+def points_to_primitives_distance_squared(P, sampled_points):
     [b, p] = P.dims.size()[:2]
     n = sampled_points.size(1)
     points = sampled_points.unsqueeze(1).repeat(1, p, 1, 1)
     points = world_to_primitive_space(points, P.quat, P.trans)
 
     dims = P.dims.unsqueeze(2).repeat(1, 1, n, 1)
+    distance = F.relu(points.abs() - dims).pow(2).sum(-1)
+
+def coverage(P, sampled_points):
+    distance = points_to_primitives_distance_squared(P, sampled_points)
     distance = F.relu(points.abs() - dims).pow(2).sum(-1)
     distance += 10 * (1 - P.exist.unsqueeze(-1))
     distance, _ = distance.min(1)
@@ -26,7 +30,9 @@ def point_indices(points, volume):
     w = grid_size * i[..., 1]
     return u.reshape(-1, 1, 1) + w + v + i[..., 2]
 
-def _consistency(volume, P, sampler, closest_points_grid):
+def _consistency(volume, P, closest_points_grid, n_samples_per_primitive):
+    sampler = CuboidSurface(n_samples_per_primitive)
+
     primitive_points = sampler.sample_points(P.dims)
     primitive_points = primitive_to_world_space(primitive_points, P.quat, P.trans)
 
@@ -43,14 +49,13 @@ def _consistency(volume, P, sampler, closest_points_grid):
 
     return distance, weights
 
-def consistency(volume, P, sampler, closest_points_grid):
-    distance, weights = _consistency(volume, P, sampler, closest_points_grid)
+def consistency(volume, P, closest_points_grid, n_samples_per_primitive):
+    distance, weights = _consistency(volume, P, closest_points_grid, n_samples_per_primitive)
     return (distance * weights).sum((1, 2))
 
 def reconstruction_loss(volume, primitives, sampled_points, closest_points_grid, n_samples_per_primitive):
     cov = coverage(primitives, sampled_points)
-    sampler = CuboidSurface(n_samples_per_primitive)
-    cons = consistency(volume, primitives, sampler, closest_points_grid)
+    cons = consistency(volume, primitives, closest_points_grid, n_samples_per_primitive)
     return cov, cons
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ import yang.utils_pytorch as utils_pt
 from tulsiani.primitives import Primitives
 
 from common.batch_provider import BatchProvider, BatchProviderParams
-from common.reconstruction_loss import reconstruction_loss
+from common.reconstruction_loss import points_to_primitives_distance_squared, consistency
 
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
@@ -74,21 +74,23 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara):
     if not hypara['W']['W_euclidean_dual_loss']:
         return loss, loss_dict
 
-    exist = out_dict_1['exist']
+    assign_matrix = out_dict_1['assign_matrix'] # batch_size * n_points * (n_cuboids * (6 = n_planes_per_cuboid))
+    print(assign_matrix.size())
+    assigned_ratio = assign_matrix.mean(1)
+
+    # exist = out_dict_1['exist']
     P = Primitives(
         out_dict_1['scale'],
         out_dict_1['rotate_quat'],
-        out_dict_1['trans'],
-        F.sigmoid(exist.reshape(exist.size(0), -1))
+        out_dict_1['pc_assign_mean'], # out_dict_1['trans'],
+        assigned_ratio # F.sigmoid(exist.reshape(exist.size(0), -1))
     )
 
-    cov, cons = reconstruction_loss(
-        volume,
-        P,
-        points,
-        closest_points,
-        hypara['W']['W_n_samples_per_primitive']
-    )
+    distance = points_to_primitives_distance_squared(P, points) # batch_size * n_cuboids * n_points
+    cov = distance * assign_matrix.transpose(1, 2)
+    cov = cov.sum((1, 2))
+
+    cons = consistency(volume, P, closest_points, hypara['W']['W_n_samples_per_primitive'])
 
     r = (cov + cons).mean() * hypara['W']['W_REC']
     loss_dict['eval'] = (r.data.detach().item() - loss_dict['REC']) * hypara['W']['W_REC']
