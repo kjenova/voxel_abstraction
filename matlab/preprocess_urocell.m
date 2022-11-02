@@ -49,7 +49,7 @@ function helper2(filename, V, label, tsdfDir)
         normalizedVertices = (FV.vertices - 0.5) / maxSize;
         standardizedVertices = normalizedVertices - 0.5;
 
-        surfaceSamples = uniform_sampling(FV.faces, standardizedVertices, numSamples);
+        surfaceSamples = sampling(FV.faces, standardizedVertices, numSamples);
 
         maxSize = max(size(cropped));
         Volume = imresize3(cropped, gridSize / maxSize);
@@ -82,7 +82,30 @@ function savefunc(tsdfFile, tsdf, Volume, closestPoints, surfaceSamples, vertice
     save(tsdfFile, 'tsdf', 'Volume', 'closestPoints', 'surfaceSamples', 'vertices', 'faces', 'normals');
 end
 
-function [samples] = uniform_sampling(faces, vertices, numSamples)
+function [finalSamples] = sampling(faces, vertices, numSamples)
+    samples = basic_sampling(faces, vertices, numSamples);
+
+    finalSamples = zeros(numSamples, 6);
+    finalSamples(:, 1:3) = samples(:, 1:3);
+
+    faceCenters = face_centers(faces, vertices);
+
+    k = 6;
+    D = pdist2(samples(:, 1:3), faceCenters(:, 1:3));
+    for sId = 1:numSamples
+        normal = zeros(1, 3);
+        [B, I] = mink(D(sId, :), k);
+        B = 1 ./ B;
+        B = B ./ sum(B);
+        for j = 1:k
+            normal = normal + B(j) * faceCenters(I(j), 4:6);
+        end
+        normal = normal / norm(normal);
+        finalSamples(sId, 4:6) = normal;
+    end
+end
+
+function [samples] = basic_sampling(faces, vertices, numSamples)
     samples = zeros(numSamples, 6);
     faceIds = datasample(1:size(faces, 1), numSamples);
     paras = rand(2, numSamples);
@@ -102,5 +125,18 @@ function [samples] = uniform_sampling(faces, vertices, numSamples)
 
         c = cross(p2 - p1, p3 - p1);
         samples(sId, 4:6) = c / norm(c);
+    end
+end
+
+function [centers] = face_centers(faces, vertices)
+    centers = zeros(size(faces, 1), 6);
+    for faceId = 1:size(faces, 1)
+        p1 = vertices(faces(faceId, 1), :);
+        p2 = vertices(faces(faceId, 2), :);
+        p3 = vertices(faces(faceId, 3), :);
+
+        centers(faceId, 1:3) = (p1 + p2 + p3) / 3;
+        c = cross(p2 - p1, p3 - p1);
+        centers(faceId, 4:6) = c / norm(c);
     end
 end
