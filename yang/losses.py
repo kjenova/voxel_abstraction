@@ -92,6 +92,9 @@ class loss_whole(nn.Module):
                                     batch_size, num_points, num_cuboids)
             loss_ins = loss_ins + REC * hypara['W']['W_REC'] 
             loss_dict['REC'] = REC.data.detach().item()
+        else:
+            REC = 0
+            loss_dict['REC'] = 0
 
         # Loss SPS
         if hypara['W']['W_SPS']  != 0:

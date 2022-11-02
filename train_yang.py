@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_sched
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
@@ -73,11 +74,12 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara):
     if not hypara['W']['W_euclidean_dual_loss']:
         return loss, loss_dict
 
+    exist = out_dict_1['exist']
     P = Primitives(
         out_dict_1['scale'],
         out_dict_1['rotate_quat'],
         out_dict_1['trans'],
-        out_dict_1['exist']
+        F.sigmoid(exist.reshape(exist.size(0), -1))
     )
 
     cov, cons = reconstruction_loss(
@@ -218,7 +220,7 @@ def validate(hypara, validation_batches, Network, loss_func, loss_weight, save_p
             model_name = utils_pt.create_name(iter, loss_dict)
             torch.save(Network.state_dict(), save_path + '/' + model_name + '.pth')
 
-            torch.save(Network.state_dict(), hypara['E_save_dir'] + '/save.torch')
+            torch.save(Network.state_dict(), hypara['E']['E_save_dir'] + '/save.torch')
 
             vertices, faces = utils_pt.generate_cube_mesh_batch(save_dict['verts_forward'], save_dict['cube_face'], hypara['L']['L_batch_size'])
             utils_pt.visualize_segmentation(save_points, color, save_dict['assign_matrix'], save_path + '/log/', 0, None)

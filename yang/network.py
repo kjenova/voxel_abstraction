@@ -241,12 +241,12 @@ class Network_Whole(nn.Module):
         # directly compute the cuboid center from segmentation branch
         pc_assign_mean = pc_assign.sum(1) / (assign_matrix.sum(1) + 1).unsqueeze(-1).repeat(1,1,3)
 
-        verts_forward = self.cube_vert.unsqueeze(0).unsqueeze(0).repeat(batch_size,self.num_cuboid,1,1) * scale.unsqueeze(2).repeat(1,1,8,1)
-        verts_forward = torch.einsum('abcd,abde->abce',rotate, verts_forward.permute(0,1,3,2)).permute(0,1,3,2)
-        verts_forward = verts_forward + pc_assign_mean.unsqueeze(2).repeat(1,1,8,1)
+        verts_untranslated = self.cube_vert.unsqueeze(0).unsqueeze(0).repeat(batch_size,self.num_cuboid,1,1) * scale.unsqueeze(2).repeat(1,1,8,1)
+        verts_untranslated = torch.einsum('abcd,abde->abce',rotate, verts_untranslated.permute(0,1,3,2)).permute(0,1,3,2)
+        verts_forward = verts_untranslated + pc_assign_mean.unsqueeze(2).repeat(1,1,8,1)
 
         # predict the cuboid center
-        verts_predict = verts_forward - pc_assign_mean.unsqueeze(2).repeat(1,1,8,1) + trans.unsqueeze(2).repeat(1,1,8,1)
+        verts_predict = verts_untranslated + trans.unsqueeze(2).repeat(1,1,8,1)
 
         return {'scale':scale,
                 'rotate':rotate,
@@ -258,7 +258,7 @@ class Network_Whole(nn.Module):
                 'verts_predict':verts_predict,
                 'cube_face':self.cube_face,
                 'x_cuboid':x_cuboid,
-                'exist':exist,
+                'exist':exist, # Da dobimo verjetnost prisotnosti, je potrebna še sigmoidna aktivacija.
                 'z':z,
                 'mu':mu,
                 'log_var':log_var}
