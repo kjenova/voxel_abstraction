@@ -18,7 +18,7 @@ import yang.utils_pytorch as utils_pt
 from tulsiani.primitives import Primitives
 
 from common.batch_provider import BatchProvider, BatchProviderParams
-from common.reconstruction_loss import points_to_primitives_distance_squared, consistency
+from common.reconstruction_loss import reconstruction_loss #, points_to_primitives_distance_squared, consistency
 
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
@@ -76,23 +76,27 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara):
 
     assign_matrix = out_dict_1['assign_matrix'] # batch_size * n_points * n_cuboids
     assigned_ratio = assign_matrix.mean(1)
+    assigned_existence = (assigned_ratio > .02).to(torch.float32).detach()
 
     # exist = out_dict_1['exist']
+    # exist = F.sigmoid(exist.reshape(exist.size(0), -1))
     P = Primitives(
         out_dict_1['scale'],
         out_dict_1['rotate_quat'],
         out_dict_1['pc_assign_mean'], # out_dict_1['trans'],
-        assigned_ratio # F.sigmoid(exist.reshape(exist.size(0), -1))
+        assigned_existence
     )
 
-    distance = points_to_primitives_distance_squared(P, points) # batch_size * n_cuboids * n_points
-    cov = distance * assign_matrix.transpose(1, 2)
-    cov = cov.sum((1, 2))
+    # distance = points_to_primitives_distance_squared(P, points) # batch_size * n_cuboids * n_points
+    # cov = distance * assign_matrix.transpose(1, 2)
+    # cov = cov.sum((1, 2))
 
-    cons = consistency(volume, P, closest_points, hypara['W']['W_n_samples_per_primitive'])
+    # cons = consistency(volume, P, closest_points, hypara['W']['W_n_samples_per_primitive'])
+
+    cov, cons = reconstruction_loss(volume, P, points, closest_points, hypara['W']['W_n_samples_per_primitive'])
 
     r = (cov + cons).mean() * hypara['W']['W_REC']
-    loss_dict['eval'] = (r.data.detach().item() - loss_dict['REC']) * hypara['W']['W_REC']
+    loss_dict['eval'] += (r.data.detach().item() - loss_dict['REC']) * hypara['W']['W_REC']
     loss_dict['REC'] = r.data.detach().item()
 
     loss += r * hypara['W']['W_REC']
@@ -109,7 +113,7 @@ def main(args):
         os.environ["CUDA_VISIBLE_DEVICES"] = str(hypara['E']['E_CUDA'])
 
     train_set = load_preprocessed(hypara['E']['E_train_dir'])
-    validation_set, _ = load_urocell_preprocessed(hypara['E']['E_urocell_dir'])
+    validation_set, test_set = load_urocell_preprocessed(hypara['E']['E_urocell_dir'])
 
     batch_params = BatchProviderParams(
         torch.device('cuda'),
@@ -126,6 +130,13 @@ def main(args):
     )
     validation_batches = BatchProvider(
         validation_set,
+        batch_params,
+        store_on_gpu = False,
+        include_normals = True,
+        uses_point_sampling = hypara['L']['L_sample_points']
+    )
+    test_batches = BatchProvider(
+        test_set,
         batch_params,
         store_on_gpu = False,
         include_normals = True,
@@ -178,6 +189,7 @@ def main(args):
                 best_eval_loss = validate(
                     hypara,
                     validation_batches,
+                    test_batches,
                     Network,
                     loss_func,
                     hypara['W'],
@@ -190,7 +202,7 @@ def main(args):
                 )
                 Network.train()
 
-def validate(hypara, validation_batches, Network, loss_func, loss_weight, save_path, iter, epoch, summary_writer, best_eval_loss, color):
+def validate(hypara, validation_batches, test_batches, Network, loss_func, loss_weight, save_path, iter, epoch, summary_writer, best_eval_loss, color):
     Network.eval()
     loss_dict = {}
     for j, data in enumerate(validation_batches.get_all_batches(shuffle = False)):
@@ -199,9 +211,7 @@ def validate(hypara, validation_batches, Network, loss_func, loss_weight, save_p
 
             outdict = Network(pc = points)
             _, cur_loss_dict = compute_loss(loss_func, data, outdict, None, hypara)
-            if j == 0:
-                save_points = points
-                save_dict = outdict
+
             if loss_dict:
                 for key in cur_loss_dict:
                     loss_dict[key] = loss_dict[key] + cur_loss_dict[key]
@@ -213,6 +223,10 @@ def validate(hypara, validation_batches, Network, loss_func, loss_weight, save_p
 
     utils_pt.print_text(loss_dict, save_path, is_train = False)
     utils_pt.valid_summaries(summary_writer, loss_dict, iter * hypara['L']['L_batch_size'])
+
+    with torch.no_grad():
+        save_points = next(test_batches.get_all_batches(shuffle = False))[1]
+        save_dict = Network(pc = save_points)
 
     if loss_dict['eval'] < best_eval_loss:
         best_eval_loss = copy.deepcopy(loss_dict['eval'])
