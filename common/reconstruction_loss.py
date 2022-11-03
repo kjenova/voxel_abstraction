@@ -11,7 +11,7 @@ def points_to_primitives_distance_squared(P, sampled_points):
     points = world_to_primitive_space(points, P.quat, P.trans)
 
     dims = P.dims.unsqueeze(2).repeat(1, 1, n, 1)
-    distance = F.relu(points.abs() - dims).pow(2).sum(-1)
+    return F.relu(points.abs() - dims).pow(2).sum(-1)
 
 def coverage(P, sampled_points):
     distance = points_to_primitives_distance_squared(P, sampled_points)

@@ -74,8 +74,7 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara):
     if not hypara['W']['W_euclidean_dual_loss']:
         return loss, loss_dict
 
-    assign_matrix = out_dict_1['assign_matrix'] # batch_size * n_points * (n_cuboids * (6 = n_planes_per_cuboid))
-    print(assign_matrix.size())
+    assign_matrix = out_dict_1['assign_matrix'] # batch_size * n_points * n_cuboids
     assigned_ratio = assign_matrix.mean(1)
 
     # exist = out_dict_1['exist']

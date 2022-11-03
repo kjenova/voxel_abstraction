@@ -176,7 +176,7 @@ class Attention_module(nn.Module):
         Q = self.conv_Q(x_per) / (self.attention_dim ** 0.5)
         K = self.conv_K(x_cuboid).transpose(2, 1)
 
-        assign_matrix = F.softmax(torch.matmul(K,Q), dim = 1).transpose(2, 1)  # (batch_size, num_point, num_cuboid*6)
+        assign_matrix = F.softmax(torch.matmul(K,Q), dim = 1).transpose(2, 1)  # (batch_size, num_point, num_cuboid)
 
         return assign_matrix
 
