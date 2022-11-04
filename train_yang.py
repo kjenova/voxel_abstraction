@@ -4,18 +4,21 @@ import copy
 import argparse
 import json
 import numpy as np
+from tensorboardX import SummaryWriter
+
 import torch
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_sched
 import torch.nn.functional as F
+from torch.distributions.bernoulli import Bernoulli
 from torch.utils.data import DataLoader
-from tensorboardX import SummaryWriter
 
 from yang.network import Network_Whole
 from yang.losses import loss_whole
 import yang.utils_pytorch as utils_pt
 
 from tulsiani.primitives import Primitives
+from tulsiani.reinforce import ReinforceRewardUpdater
 
 from common.batch_provider import BatchProvider, BatchProviderParams
 from common.reconstruction_loss import reconstruction_loss #, points_to_primitives_distance_squared, consistency
@@ -66,7 +69,7 @@ def parsing_hyperparas(args):
 # Ko je euclidean dual loss = True, reconstruction loss-a ne računamo po
 # metodi Yang in Chen (ki upošteva normalne vektorje), temveč po "navadni"
 # formuli iz Tulsiani in sod.
-def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara):
+def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_updater = None):
     volume, points, closest_points, normals = data
 
     loss, loss_dict = loss_func(points, normals, out_dict_1, out_dict_2, hypara)
@@ -74,32 +77,64 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara):
     if not hypara['W']['W_euclidean_dual_loss']:
         return loss, loss_dict
 
-    assign_matrix = out_dict_1['assign_matrix'] # batch_size * n_points * n_cuboids
-    assigned_ratio = assign_matrix.mean(1)
-    assigned_existence = (assigned_ratio > .02).to(torch.float32).detach()
+    use_reinforce = True
 
-    # exist = out_dict_1['exist']
-    # exist = F.sigmoid(exist.reshape(exist.size(0), -1))
-    P = Primitives(
-        out_dict_1['scale'],
-        out_dict_1['rotate_quat'],
-        out_dict_1['pc_assign_mean'], # out_dict_1['trans'],
-        assigned_existence
-    )
+    if use_reinforce:
+        prob = out_dict_1['exist']
+        prob = F.sigmoid(exist.reshape(exist.size(0), -1))
 
-    # distance = points_to_primitives_distance_squared(P, points) # batch_size * n_cuboids * n_points
-    # cov = distance * assign_matrix.transpose(1, 2)
-    # cov = cov.sum((1, 2))
+        distr = Bernoulli(prob)
+        exist = distr.sample()
+        log_prob = distr.log_prob(exist)
 
-    # cons = consistency(volume, P, closest_points, hypara['W']['W_n_samples_per_primitive'])
+        P = Primitives(
+            out_dict_1['scale'],
+            out_dict_1['rotate_quat'],
+            out_dict_1['pc_assign_mean'],
+            exist,
+            prob,
+            log_prob
+        )
 
-    cov, cons = reconstruction_loss(volume, P, points, closest_points, hypara['W']['W_n_samples_per_primitive'])
+        cov, cons = reconstruction_loss(volume, P, points, closest_points, hypara['W']['W_n_samples_per_primitive'])
 
-    r = (cov + cons).mean() * hypara['W']['W_REC']
-    loss_dict['eval'] += (r.data.detach().item() - loss_dict['REC']) * hypara['W']['W_REC']
-    loss_dict['REC'] = r.data.detach().item()
+        r = cov + cons
 
-    loss += r * hypara['W']['W_REC']
+        if reinforce_updater: # Samo pri treniranju.
+            existence_penalty = 8e-5
+            for p in range(exist.size(1)):
+                penalty = r + existence_penalty * P.exist[:, p]
+                P.log_prob[:, p] *= reinforce_updater.update(penalty)
+
+        l = r.mean() + P.log_prob.mean()
+    else:
+        assign_matrix = out_dict_1['assign_matrix'] # batch_size * n_points * n_cuboids
+        assigned_ratio = assign_matrix.mean(1)
+        assigned_existence = (assigned_ratio > .02).to(torch.float32).detach()
+
+        # exist = out_dict_1['exist']
+        # exist = F.sigmoid(exist.reshape(exist.size(0), -1))
+        P = Primitives(
+            out_dict_1['scale'],
+            out_dict_1['rotate_quat'],
+            out_dict_1['pc_assign_mean'], # out_dict_1['trans'],
+            assigned_existence
+        )
+
+        # distance = points_to_primitives_distance_squared(P, points) # batch_size * n_cuboids * n_points
+        # cov = distance * assign_matrix.transpose(1, 2)
+        # cov = cov.sum((1, 2))
+
+        # cons = consistency(volume, P, closest_points, hypara['W']['W_n_samples_per_primitive'])
+
+        cov, cons = reconstruction_loss(volume, P, points, closest_points, hypara['W']['W_n_samples_per_primitive'])
+
+        l = (cov + cons).mean()
+
+    loss_dict['eval'] += (l.data.detach().item() - loss_dict['REC']) * hypara['W']['W_REC']
+    loss_dict['REC'] = l.data.detach().item()
+
+    loss += l * hypara['W']['W_REC']
 
     loss_dict['ALL'] = loss.data.detach().item()
 
@@ -157,6 +192,8 @@ def main(args):
         betas = (hypara['L']['L_adam_beta1'], 0.999)
     )
 
+    reinforce_updater = ReinforceRewardUpdater(.9)
+
     # Training Processing
     best_eval_loss = 100000
     color = utils_pt.generate_ncolors(hypara['N']['N_num_cubes'])
@@ -167,7 +204,7 @@ def main(args):
             optimizer.zero_grad()
 
             outdict = Network(pc = data[1])
-            loss, loss_dict = compute_loss(loss_func, data, outdict, None, hypara)
+            loss, loss_dict = compute_loss(loss_func, data, outdict, None, hypara, reinforce_updater)
 
             loss.backward()
             optimizer.step()
@@ -291,4 +328,11 @@ if __name__ == '__main__':
     parser.add_argument('--W_CST', default = 0.00, type = float, help = 'CST loss weight, this loss is only for generation application')
 
     args = parser.parse_args()
+
+    if args['W_euclidean_dual_loss']:
+        args['W_EXT'] = .0
+        args['W_SPS'] = .0
+        args['W_CST'] = .0
+        # Kullback-Leiblerja razdalja pa ostane.
+
     main(args)
