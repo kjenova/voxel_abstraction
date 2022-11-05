@@ -92,7 +92,7 @@ class loss_whole(nn.Module):
                                     batch_size, num_points, num_cuboids)
             loss_ins = loss_ins + REC * hypara['W']['W_REC']
             REC = REC.data.detach().item()
-            loss_dict['REC'] = REC.data.detach().item()
+            loss_dict['REC'] = REC
         else:
             REC = 0
             loss_dict['REC'] = 0
