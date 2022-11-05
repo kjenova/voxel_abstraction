@@ -64,6 +64,12 @@ def parsing_hyperparas(args):
         json.dump(hypara, f)
     summary_writer = SummaryWriter(save_path + '/tensorboard')
 
+    if hypara['W']['W_euclidean_dual_loss']:
+        hypara['W']['W_EXT'] = .0
+        hypara['W']['W_SPS'] = .0
+        hypara['W']['W_CST'] = .0
+        # Kullback-Leiblerja razdalja pa ostane.
+
     return hypara, save_path, summary_writer
 
 # Ko je euclidean dual loss = True, reconstruction loss-a ne računamo po
@@ -81,7 +87,7 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_upda
 
     if use_reinforce:
         prob = out_dict_1['exist']
-        prob = F.sigmoid(exist.reshape(exist.size(0), -1))
+        prob = F.sigmoid(prob.reshape(prob.size(0), -1))
 
         distr = Bernoulli(prob)
         exist = distr.sample()
@@ -106,7 +112,9 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_upda
                 penalty = r + existence_penalty * P.exist[:, p]
                 P.log_prob[:, p] *= reinforce_updater.update(penalty)
 
-        l = r.mean() + P.log_prob.mean()
+            l = r.mean() + P.log_prob.mean()
+        else:
+            l = r.mean()
     else:
         assign_matrix = out_dict_1['assign_matrix'] # batch_size * n_points * n_cuboids
         assigned_ratio = assign_matrix.mean(1)
@@ -328,11 +336,4 @@ if __name__ == '__main__':
     parser.add_argument('--W_CST', default = 0.00, type = float, help = 'CST loss weight, this loss is only for generation application')
 
     args = parser.parse_args()
-
-    if args['W_euclidean_dual_loss']:
-        args['W_EXT'] = .0
-        args['W_SPS'] = .0
-        args['W_CST'] = .0
-        # Kullback-Leiblerja razdalja pa ostane.
-
     main(args)

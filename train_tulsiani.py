@@ -73,7 +73,7 @@ def train(network, train_batches, validation_batches, params, stats):
                 for (volume, sampled_points, closest_points) in validation_batches.get_all_batches():
                     P = network(volume)
                     cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params)
-                    validation_loss += (cov + cons).sum()
+                    validation_loss += (cov + cons).sum() # .sum() zato, ker kasneje delimo.
 
             network.train()
 

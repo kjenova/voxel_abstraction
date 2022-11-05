@@ -90,7 +90,8 @@ class loss_whole(nn.Module):
             REC = self.compute_REC(idx_normals_sim_max, out_dict_1['assign_matrix'],out_dict_1['scale'],\
                                     pc_inver, pc_sample_inver, planes_scaled, mask_project, mask_plane,\
                                     batch_size, num_points, num_cuboids)
-            loss_ins = loss_ins + REC * hypara['W']['W_REC'] 
+            loss_ins = loss_ins + REC * hypara['W']['W_REC']
+            REC = REC.data.detach().item()
             loss_dict['REC'] = REC.data.detach().item()
         else:
             REC = 0
@@ -126,7 +127,7 @@ class loss_whole(nn.Module):
         if hypara['W']['W_SPS'] != 0:
             loss_dict['eval'] = (REC * hypara['W']['W_REC']  + SPS * hypara['W']['W_SPS'] ).data.detach().item()
         else:
-            loss_dict['eval'] = (REC * hypara['W']['W_REC']  + 0 * hypara['W']['W_SPS'] ).data.detach().item()
+            loss_dict['eval'] = REC * hypara['W']['W_REC']
         loss_dict['mu'] = torch.mean(torch.mean(out_dict_1['mu'],1),0).data.detach().item()
         loss_dict['var'] = torch.mean(torch.mean(out_dict_1['log_var'].exp(),1),0).data.detach().item()
 
