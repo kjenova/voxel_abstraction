@@ -125,8 +125,8 @@ class Feature_extract(nn.Module):
 
         if self.nonvariational:
             mu = None
-            var = None
-            z = self.nonvariational_enc(x_global.squeeze(-1))
+            log_var = None
+            z = self.nonvariational_enc(x_global.squeeze(-1)).unsqueeze(-1)
         else:
             mu = self.fc_mu(x_global.squeeze(-1))
             log_var = self.fc_var(x_global.squeeze(-1))
@@ -272,10 +272,10 @@ class Network_Whole(nn.Module):
 
             verts_forward = verts_untranslated + pc_assign_mean.unsqueeze(2).repeat(1,1,8,1)
         else:
-            assign_matrix = None
+            assign_matrix = torch.ones(batch_size, pc.size(1), self.num_cuboid, device = pc.device)
             pc_assign = None
             pc_assign_mean = None
-            verts_forward = None
+            verts_forward = verts_predict
 
         return {'scale':scale,
                 'rotate':rotate,

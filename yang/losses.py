@@ -59,7 +59,7 @@ class loss_whole(nn.Module):
         num_cuboids = out_dict_1['scale'].shape[1]
         num_points = pc.shape[1]
 
-        loss_ins = 0
+        loss_ins = torch.zeros(1, device = out_dict_1['scale'].device)
         loss_dict = {}
 
         # Loss REC
