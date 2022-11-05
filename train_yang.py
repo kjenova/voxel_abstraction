@@ -66,6 +66,9 @@ def parsing_hyperparas(args):
         hypara['W']['W_CST'] = .0
         # Kullback-Leiblerja razdalja pa ostane.
 
+    if hypara['N']['N_nonvariational_network']:
+        hypara['W']['W_KLD'] = .0
+
     # save hyper-parameters to json
     with open(save_path + '/hypara.json', 'w') as f:
         json.dump(hypara, f)
@@ -322,6 +325,7 @@ if __name__ == '__main__':
     parser.add_argument('--N_dim_z', default = 512, type = int, help = 'Dimension of latent code Z')
     parser.add_argument('--N_dim_att', default = 64, type = int, help = 'Dimension of query and key in attention')
     parser.add_argument('--N_num_cubes', default = 16, type = int, help = 'Number of cuboids')
+    parser.add_argument('--N_nonvariational_network', action = 'store_true')
 
     # Weight(W) hyper-parameters of losses
     # Če je ta flag nastavljen, se za reconstruction loss uporablja loss iz Tulsiani in sod., drugače

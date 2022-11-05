@@ -7,13 +7,14 @@ from .utils_pytorch import quat2mat
 
 ##########################################################################################################################
 class Feature_extract(nn.Module):
-    def __init__(self, emb_dims, z_dims, k, num_cuboid, low_dim_idx):
+    def __init__(self, emb_dims, z_dims, k, num_cuboid, low_dim_idx, nonvariational):
         super(Feature_extract, self).__init__()
         self.emb_dims = emb_dims
         self.z_dims = z_dims
         self.k = k
         self.num_cuboid = num_cuboid
         self.low_dim_idx = low_dim_idx
+        self.nonvariational = nonvariational
         self.cuboid_vector = torch.eye(self.num_cuboid).float().cuda().detach()
         self.bn1_1 = nn.BatchNorm2d(64)
         self.bn1_2 = nn.BatchNorm2d(64)
@@ -36,8 +37,11 @@ class Feature_extract(nn.Module):
                                    self.bn3_1,
                                    nn.LeakyReLU(negative_slope=0.2, inplace = True))
 
-        self.fc_mu  = nn.Linear(self.emb_dims, self.z_dims)
-        self.fc_var = nn.Linear(self.emb_dims, self.z_dims)
+        if self.nonvariational:
+            self.nonvariational_enc = nn.Linear(self.emb_dims, self.z_dims)
+        else:
+            self.fc_mu  = nn.Linear(self.emb_dims, self.z_dims)
+            self.fc_var = nn.Linear(self.emb_dims, self.z_dims)
 
         self.enc_cuboid_vec = nn.Sequential(nn.Conv1d(self.num_cuboid, 64, kernel_size=1, bias=False),
                                             nn.LeakyReLU(negative_slope=0.2, inplace = True))
@@ -119,10 +123,13 @@ class Feature_extract(nn.Module):
         x_global = self.conv3(x_per)                       # (batch_size, 64*3, num_points) -> (batch_size, emb_dims, num_points)
         x_global = x_global.max(dim=-1, keepdim=True)[0]   # (batch_size, emb_dims, num_points) -> (batch_size, emb_dims, 1)
 
-        mu = self.fc_mu(x_global.squeeze(-1))
-        log_var = self.fc_var(x_global.squeeze(-1))
+        if self.nonvariational:
+            z = self.nonvariational_enc(x_global.squeeze(-1))
+        else:
+            mu = self.fc_mu(x_global.squeeze(-1))
+            log_var = self.fc_var(x_global.squeeze(-1))
 
-        z = self.reparameterize(mu, log_var).unsqueeze(-1)
+            z = self.reparameterize(mu, log_var).unsqueeze(-1)
 
         cuboid_vec = self.cuboid_vector.unsqueeze(0).repeat(batch_size,1,1)           # (batch_size, num_cuboid, num_cuboid)
         cuboid_vec = self.enc_cuboid_vec(cuboid_vec)                                  # (batch_size, 64, num_cuboid)
@@ -190,12 +197,20 @@ class Network_Whole(nn.Module):
         self.emb_dims = hypara['N']['N_dim_emb']
         self.z_dims = hypara['N']['N_dim_z']
         self.attention_dim = hypara['N']['N_dim_att']
+        self.nonvariational = hypara['N']['N_nonvariational_network']
 
         self.cube_vert = torch.FloatTensor([[-1,-1,-1],[-1,-1,1],[-1,1,-1],[-1,1,1],[1,-1,-1],[1,-1,1],[1,1,-1],[1,1,1]]).cuda().detach()
         self.cube_face = torch.FloatTensor([[0,2,3],[0,3,1],[0,1,2],[1,3,2],[4,6,7],[4,7,5],[4,5,6],[5,7,6],[0,4,5],[0,5,1],[0,1,4],[1,5,4],\
                                             [2,6,7],[2,7,3],[2,3,6],[3,7,6],[0,4,6],[0,6,2],[0,2,4],[2,6,4],[1,5,7],[1,7,3],[1,3,5],[3,7,5]]).cuda().detach()
 
-        self.Feature_extract = Feature_extract(emb_dims = self.emb_dims,z_dims = self.z_dims, k = self.k , num_cuboid = self.num_cuboid, low_dim_idx = self.low_dim_idx)
+        self.Feature_extract = Feature_extract(
+            emb_dims = self.emb_dims,
+            z_dims = self.z_dims,
+            k = self.k,
+            num_cuboid = self.num_cuboid,
+            low_dim_idx = self.low_dim_idx,
+            nonvariational = self.nonvariational
+        )
         self.Para_pred = Para_pred()
         self.Attention_module = Attention_module(attention_dim = self.attention_dim)
 
