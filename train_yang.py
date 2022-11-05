@@ -100,7 +100,7 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_upda
             log_prob = distr.log_prob(exist)
 
         P = Primitives(
-            out_dict_1['scale'],
+            out_dict_1['scale'] * .5, # krat .5 zaradi kompatibilnosti s Tulsiani...
             out_dict_1['rotate_quat'],
             out_dict_1['trans'],
             torch.ones(prob.size(0), prob.size(1), device = prob.device),
