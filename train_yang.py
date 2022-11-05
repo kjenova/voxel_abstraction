@@ -59,16 +59,17 @@ def parsing_hyperparas(args):
         save_path = save_path + '_' + str(hypara['W'][key])
     if not os.path.exists(save_path + '/log/'): 
         os.makedirs(save_path + '/log/')
-    # save hyper-parameters to json
-    with open(save_path + '/hypara.json', 'w') as f:
-        json.dump(hypara, f)
-    summary_writer = SummaryWriter(save_path + '/tensorboard')
 
     if hypara['W']['W_euclidean_dual_loss']:
         hypara['W']['W_EXT'] = .0
         hypara['W']['W_SPS'] = .0
         hypara['W']['W_CST'] = .0
         # Kullback-Leiblerja razdalja pa ostane.
+
+    # save hyper-parameters to json
+    with open(save_path + '/hypara.json', 'w') as f:
+        json.dump(hypara, f)
+    summary_writer = SummaryWriter(save_path + '/tensorboard')
 
     return hypara, save_path, summary_writer
 
