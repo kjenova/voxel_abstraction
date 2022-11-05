@@ -91,34 +91,37 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_upda
 
     if use_reinforce:
         prob = out_dict_1['exist']
-        prob = F.sigmoid(prob.reshape(prob.size(0), -1))
 
-        distr = Bernoulli(prob)
-        exist = distr.sample()
-        log_prob = distr.log_prob(exist)
+        if False:
+            prob = F.sigmoid(prob.reshape(prob.size(0), -1))
+
+            distr = Bernoulli(prob)
+            exist = distr.sample()
+            log_prob = distr.log_prob(exist)
 
         P = Primitives(
             out_dict_1['scale'],
             out_dict_1['rotate_quat'],
-            out_dict_1['pc_assign_mean'],
-            exist,
-            prob,
-            log_prob
+            out_dict_1['trans'],
+            torch.ones(prob.size(0), prob.size(1), device = prob.device),
         )
 
         cov, cons = reconstruction_loss(volume, P, points, closest_points, hypara['W']['W_n_samples_per_primitive'])
 
-        r = cov + cons
+        l = (cov + cons).mean()
 
-        if reinforce_updater: # Samo pri treniranju.
-            existence_penalty = 8e-5
-            for p in range(exist.size(1)):
-                penalty = r + existence_penalty * P.exist[:, p]
-                P.log_prob[:, p] *= reinforce_updater.update(penalty)
+        if False:
+            r = cov + cons
 
-            l = r.mean() + P.log_prob.mean()
-        else:
-            l = r.mean()
+            if reinforce_updater: # Samo pri treniranju.
+                existence_penalty = 8e-5
+                for p in range(exist.size(1)):
+                    penalty = r + existence_penalty * P.exist[:, p]
+                    P.log_prob[:, p] *= reinforce_updater.update(penalty)
+
+                l = r.mean() + P.log_prob.mean()
+            else:
+                l = r.mean()
     else:
         assign_matrix = out_dict_1['assign_matrix'] # batch_size * n_points * n_cuboids
         assigned_ratio = assign_matrix.mean(1)
