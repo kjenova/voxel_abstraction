@@ -124,6 +124,8 @@ class Feature_extract(nn.Module):
         x_global = x_global.max(dim=-1, keepdim=True)[0]   # (batch_size, emb_dims, num_points) -> (batch_size, emb_dims, 1)
 
         if self.nonvariational:
+            mu = None
+            var = None
             z = self.nonvariational_enc(x_global.squeeze(-1))
         else:
             mu = self.fc_mu(x_global.squeeze(-1))
@@ -189,7 +191,7 @@ class Attention_module(nn.Module):
 
 ##########################################################################################################################
 class Network_Whole(nn.Module):
-    def __init__(self, hypara):
+    def __init__(self, hypara, has_attention = True):
         super(Network_Whole, self).__init__()
         self.low_dim_idx = hypara['N']['N_if_low_dim']
         self.num_cuboid = hypara['N']['N_num_cubes']
@@ -198,6 +200,7 @@ class Network_Whole(nn.Module):
         self.z_dims = hypara['N']['N_dim_z']
         self.attention_dim = hypara['N']['N_dim_att']
         self.nonvariational = hypara['N']['N_nonvariational_network']
+        self.has_attention = has_attention
 
         self.cube_vert = torch.FloatTensor([[-1,-1,-1],[-1,-1,1],[-1,1,-1],[-1,1,1],[1,-1,-1],[1,-1,1],[1,1,-1],[1,1,1]]).cuda().detach()
         self.cube_face = torch.FloatTensor([[0,2,3],[0,3,1],[0,1,2],[1,3,2],[4,6,7],[4,7,5],[4,5,6],[5,7,6],[0,4,5],[0,5,1],[0,1,4],[1,5,4],\
@@ -211,8 +214,11 @@ class Network_Whole(nn.Module):
             low_dim_idx = self.low_dim_idx,
             nonvariational = self.nonvariational
         )
+
         self.Para_pred = Para_pred()
-        self.Attention_module = Attention_module(attention_dim = self.attention_dim)
+
+        if self.has_attention:
+            self.Attention_module = Attention_module(attention_dim = self.attention_dim)
 
     def sample(self, num_samples):
         x_cuboid = self.Feature_extract.sample(num_samples)
@@ -249,19 +255,27 @@ class Network_Whole(nn.Module):
         # scale B * N * 3
         x_per, x_cuboid, z, mu, log_var = self.Feature_extract(pc)
         scale, rotate_quat, trans, exist = self.Para_pred(x_cuboid)
-        rotate = quat2mat(F.normalize(rotate_quat,dim=2,p=2)) 
-        assign_matrix = self.Attention_module(x_per, x_cuboid)
-
-        pc_assign = pc.unsqueeze(2).repeat(1,1,self.num_cuboid,1) * assign_matrix.unsqueeze(-1).repeat(1,1,1,3)
-        # directly compute the cuboid center from segmentation branch
-        pc_assign_mean = pc_assign.sum(1) / (assign_matrix.sum(1) + 1).unsqueeze(-1).repeat(1,1,3)
+        rotate = quat2mat(F.normalize(rotate_quat,dim=2,p=2))
 
         verts_untranslated = self.cube_vert.unsqueeze(0).unsqueeze(0).repeat(batch_size,self.num_cuboid,1,1) * scale.unsqueeze(2).repeat(1,1,8,1)
         verts_untranslated = torch.einsum('abcd,abde->abce',rotate, verts_untranslated.permute(0,1,3,2)).permute(0,1,3,2)
-        verts_forward = verts_untranslated + pc_assign_mean.unsqueeze(2).repeat(1,1,8,1)
 
         # predict the cuboid center
         verts_predict = verts_untranslated + trans.unsqueeze(2).repeat(1,1,8,1)
+
+        if self.has_attention:
+            assign_matrix = self.Attention_module(x_per, x_cuboid)
+
+            pc_assign = pc.unsqueeze(2).repeat(1,1,self.num_cuboid,1) * assign_matrix.unsqueeze(-1).repeat(1,1,1,3)
+            # directly compute the cuboid center from segmentation branch
+            pc_assign_mean = pc_assign.sum(1) / (assign_matrix.sum(1) + 1).unsqueeze(-1).repeat(1,1,3)
+
+            verts_forward = verts_untranslated + pc_assign_mean.unsqueeze(2).repeat(1,1,8,1)
+        else:
+            assign_matrix = None
+            pc_assign = None
+            pc_assign_mean = None
+            verts_forward = None
 
         return {'scale':scale,
                 'rotate':rotate,

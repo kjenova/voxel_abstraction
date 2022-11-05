@@ -128,7 +128,12 @@ class loss_whole(nn.Module):
             loss_dict['eval'] = (REC * hypara['W']['W_REC']  + SPS * hypara['W']['W_SPS'] ).data.detach().item()
         else:
             loss_dict['eval'] = REC * hypara['W']['W_REC']
-        loss_dict['mu'] = torch.mean(torch.mean(out_dict_1['mu'],1),0).data.detach().item()
-        loss_dict['var'] = torch.mean(torch.mean(out_dict_1['log_var'].exp(),1),0).data.detach().item()
+
+        if out_dict_1['mu'] != None:
+            loss_dict['mu'] = torch.mean(torch.mean(out_dict_1['mu'],1),0).data.detach().item()
+            loss_dict['var'] = torch.mean(torch.mean(out_dict_1['log_var'].exp(),1),0).data.detach().item()
+        else:
+            loss_dict['mu'] = .0
+            loss_dict['var'] = .0
 
         return loss_ins, loss_dict

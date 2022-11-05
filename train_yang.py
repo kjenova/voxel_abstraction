@@ -194,7 +194,7 @@ def main(args):
     )
 
     # Create Model
-    Network = Network_Whole(hypara).cuda()
+    Network = Network_Whole(hypara, has_attention = not hypara['W']['W_euclidean_dual_loss']).cuda()
     Network.train()
 
     # Create Loss Function
