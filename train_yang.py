@@ -87,7 +87,7 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_upda
     if not hypara['W']['W_euclidean_dual_loss']:
         return loss, loss_dict
 
-    use_reinforce = True
+    use_reinforce = False
 
     if use_reinforce:
         prob = out_dict_1['exist']
@@ -130,7 +130,7 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_upda
         # exist = out_dict_1['exist']
         # exist = F.sigmoid(exist.reshape(exist.size(0), -1))
         P = Primitives(
-            out_dict_1['scale'],
+            out_dict_1['scale'] * .5, # krat .5 zaradi kompatibilnosti s Tulsiani...
             out_dict_1['rotate_quat'],
             out_dict_1['pc_assign_mean'], # out_dict_1['trans'],
             assigned_existence
@@ -194,7 +194,7 @@ def main(args):
     )
 
     # Create Model
-    Network = Network_Whole(hypara, has_attention = not hypara['W']['W_euclidean_dual_loss']).cuda()
+    Network = Network_Whole(hypara).cuda()
     Network.train()
 
     # Create Loss Function
