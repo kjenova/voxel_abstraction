@@ -72,7 +72,7 @@ def train(network, train_batches, validation_batches, params, stats):
             with torch.no_grad():
                 for (volume, sampled_points, closest_points) in validation_batches.get_all_batches():
                     P = network(volume)
-                    cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params)
+                    cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params.n_samples_per_primitive)
                     validation_loss += (cov + cons).sum() # .sum() zato, ker kasneje delimo.
 
             network.train()
@@ -94,7 +94,7 @@ try:
 except FileExistsError:
     pass
 
-train_set = load_preprocessed(params.train_dir, 32)
+train_set = load_preprocessed(params.train_dir)
 
 params.grid_size = train_set[0].resized_volume.shape[0]
 
