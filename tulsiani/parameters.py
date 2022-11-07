@@ -39,6 +39,7 @@ params.n_samples_per_primitive = 150
 params.batch_size = 32
 params.use_batch_normalization_conv = True
 params.use_batch_normalization_linear = True
+params.add_coordinates_to_encoder = True
 params.learning_rate = 1e-3
 params.reinforce_baseline_momentum = .9
 

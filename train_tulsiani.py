@@ -94,7 +94,7 @@ try:
 except FileExistsError:
     pass
 
-train_set = load_preprocessed(params.train_dir)
+train_set = load_preprocessed(params.train_dir, 32)
 
 params.grid_size = train_set[0].resized_volume.shape[0]
 
