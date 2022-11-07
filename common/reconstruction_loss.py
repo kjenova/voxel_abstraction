@@ -13,11 +13,14 @@ def points_to_primitives_distance_squared(P, sampled_points):
     dims = P.dims.unsqueeze(2).repeat(1, 1, n, 1)
     return F.relu(points.abs() - dims).pow(2).sum(-1)
 
-def coverage(P, sampled_points):
+def _coverage(P, sampled_points):
     distance = points_to_primitives_distance_squared(P, sampled_points)
     distance += 10 * (1 - P.exist.unsqueeze(-1))
     distance, _ = distance.min(1)
-    return distance.mean(1)
+    return distance
+
+def coverage(P, sampled_points):
+    return _coverage(P, sampled_points).mean(1)
 
 def point_indices(points, volume):
     [b, grid_size] = volume.size()[:2]
@@ -56,6 +59,36 @@ def reconstruction_loss(volume, primitives, sampled_points, closest_points_grid,
     cov = coverage(primitives, sampled_points)
     cons = consistency(volume, primitives, closest_points_grid, n_samples_per_primitive)
     return cov, cons
+
+def voxel_center_points(n, device):
+    c = torch.linspace(-.5 + .5 / n, .5 - .5 / n, n, device = device)
+    return torch.cartesian_prod(c, c, c)
+
+center_points = None
+
+def voxel_loss(volume, P):
+    [b, p] = P.dims
+    grid_size = volume.size(1)
+
+    global center_points
+    if center_points is None:
+        center_points = centers_linspace(grid_size, volume.device)
+        center_points = center_points.unsqueeze(-1).repeat(b, 1, 1)
+
+    distance_squared = _coverage(P, center_points)
+
+    # Želimo, da je distance[...] ~= 0 samo, ko je volume[...] = False.
+    # Se pravi, da so samo polni voksli obdani znotraj primitivov.
+
+    # "Standardno deviacijo" razdalj nastavimo na eno osmino velikosti voksla.
+    # Inverz variance pa je:
+    # 1 / std ** 2 = 1 / (1 / (grid_size * 8)) ** 2 =
+    inv_variance = (grid_size * 8) ** 2
+    inside_primitive = (distance_squared * -inv_variance).exp()
+
+    v = volume.reshape(b, -1)
+    loss = inside_primitive * (1 - v) + (1 - inside_primitive) * v
+    return loss.mean()
 
 if __name__ == "__main__":
     from load_shapes import voxel_center_points
