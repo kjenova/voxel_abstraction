@@ -16,7 +16,7 @@ from graphics.colors import colors
 
 from tulsiani.parameters import params
 
-prob_threshold = .5
+prob_threshold = .0 if params.use_paschalidou_loss else .5
 remove_redundant = False # TODO
 
 n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
