@@ -27,7 +27,7 @@ def train(network, train_batches, validation_batches, params, stats):
 
     network.train()
     for _ in range(n_iterations):
-        i = train_batches.iteration - 1
+        i = train_batches.iteration
 
         optimizer.zero_grad()
 
@@ -75,14 +75,14 @@ def train(network, train_batches, validation_batches, params, stats):
         if i % params.save_iteration == 0:
             cov_mean = stats.cov[i - params.save_iteration : i].mean()
             cons_mean = stats.cons[i - params.save_iteration : i].mean()
-            mean_parsimony = stats.parsimony[i - params.save_iteration : i].mean()
+            parsimony_mean = stats.parsimony[i - params.save_iteration : i].mean()
             mean_prob = stats.prob_means[i - params.save_iteration : i].mean()
             mean_penalty = stats.penalty_means[i - params.save_iteration : i].mean()
 
             print(f'---- iteration {i} ----')
             print(f'    loss {cov_mean + cons_mean + parsimony_mean}, cov: {cov_mean}, cons: {cons_mean}')
 
-            if self.use_paschalidou_loss:
+            if params.use_paschalidou_loss:
                 print(f'    parsimony {parsimony_mean}')
             else:
                 print(f'    mean prob: {mean_prob}')
@@ -96,7 +96,7 @@ def train(network, train_batches, validation_batches, params, stats):
                 for (volume, sampled_points, closest_points) in validation_batches.get_all_batches():
                     P = network(volume)
 
-                    if self.use_paschalidou_loss:
+                    if params.use_paschalidou_loss:
                         cov, cons = paschalidou_reconstruction_loss(volume, P, sampled_points, closest_points, params)
                         parsimony = paschalidou_parsimony_loss(P, params)
 

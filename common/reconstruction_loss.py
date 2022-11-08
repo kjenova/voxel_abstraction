@@ -66,7 +66,7 @@ def paschalidou_reconstruction_loss(volume, P, shape_points, closest_points_grid
 
     sorted_distance, indices = distance.sort()
     [b, n, p] = indices.size()
-    indices += p * torch.arange(0, b, device = indices.device).reshape(b, 1, 1)
+    indices = indices + p * torch.arange(0, b, device = indices.device).reshape(b, 1, 1)
     sorted_prob = P.prob.take(indices)
 
     # Verjetnost, da bližji primitivi niso prisotni.
