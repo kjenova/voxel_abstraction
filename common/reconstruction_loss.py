@@ -100,7 +100,7 @@ def paschalidou_parsimony_loss(P, params):
 
     entropy = entropy_bernoulli(P.prob)
 
-    return (lower_bound + entropy).sum(-1)
+    return (lower_bound + entropy).mean(-1)
 
 if __name__ == "__main__":
     from load_shapes import voxel_center_points
