@@ -20,7 +20,7 @@ def train(network, train_batches, validation_batches, params, stats):
 
     best_validation_loss = float('inf')
 
-    if params.use_paschalidou_loss
+    if params.use_paschalidou_loss:
         n_iterations = params.paschalidou_n_iterations
     else:
         n_iterations = params.n_iterations[params.phase]

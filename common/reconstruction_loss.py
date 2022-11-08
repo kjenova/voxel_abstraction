@@ -60,13 +60,13 @@ def reconstruction_loss(volume, primitives, shape_points, closest_points_grid, n
     cons = consistency(volume, primitives, closest_points_grid, n_samples_per_primitive)
     return cov, cons
 
-def paschalidou_reconstruction_loss(volume, primitives, shape_points, closest_points_grid, params):
-    distance = points_to_primitives_distance_squared(primitives, shape_points)
+def paschalidou_reconstruction_loss(volume, P, shape_points, closest_points_grid, params):
+    distance = points_to_primitives_distance_squared(P, shape_points)
     distance = distance.transpose(1, 2)
 
     sorted_distance, indices = distance.sort()
     [b, n, p] = indices.size()
-    indices += p * torch.arange(0, b, device = indices.device)
+    indices += p * torch.arange(0, b, device = indices.device).reshape(b, 1, 1)
     sorted_prob = P.prob.take(indices)
 
     # Verjetnost, da bližji primitivi niso prisotni.
@@ -77,29 +77,17 @@ def paschalidou_reconstruction_loss(volume, primitives, shape_points, closest_po
     )
 
     # Verjetnost, da je k-ti primitiv najbližji.
-    minprob = sorted_probs * neg_cumprob
+    minprob = sorted_prob * neg_cumprod
 
     cov = (sorted_distance * minprob).mean((1, 2))
 
-    cons = consistency(volume, primitives, closest_points_grid, params.n_samples_per_primitive, True)
+    cons = consistency(volume, P, closest_points_grid, params.n_samples_per_primitive, True)
 
     return cov, cons
 
 def paschalidou_parsimony_loss(P, params):
     prob_sum = P.prob.sum(-1)
     return F.relu(params.paschalidou_alpha * (1 - prob_sum)) + params.paschalidou_beta * prob_sum.sqrt()
-
-def __paschalidou_loss(volume, primitives, shape_points, n_samples_per_primitive):
-    shape_points_transformed = points_to_primitive_space(primitives, shape_points)
-
-    sampler = CuboidSurface(n_samples_per_primitive)
-    primitive_points = sampler.sample_points(P.dims)
-
-    # shape_points_transformed: b * p * n_samples_per_shape * 3
-    # primitive_points: b * p * n_samples_per_primitive * 3
-    # distances: b * p * n_samples_per_primitive * n_samples_per_shape * 3
-    distances = primitive_points.unsqueeze(3) - shape_points_transformed.unsqueeze(2)
-    distance = (distances ** 2).sum(-1)
 
 if __name__ == "__main__":
     from load_shapes import voxel_center_points
