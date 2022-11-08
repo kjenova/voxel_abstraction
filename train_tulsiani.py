@@ -20,13 +20,8 @@ def train(network, train_batches, validation_batches, params, stats):
 
     best_validation_loss = float('inf')
 
-    if params.use_paschalidou_loss:
-        n_iterations = params.paschalidou_n_iterations
-    else:
-        n_iterations = params.n_iterations[params.phase]
-
     network.train()
-    for _ in range(n_iterations):
+    for _ in range(params.iterations):
         i = train_batches.iteration
 
         optimizer.zero_grad()

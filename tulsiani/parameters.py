@@ -13,6 +13,20 @@ class TulsianiParams:
     def existence_penalty(self):
         return self.existence_penalties[self.phase]
 
+    @property
+    def iterations(self):
+        if self.use_paschalidou_loss:
+            return self.paschalidou_n_iterations
+        else:
+            return self.n_iterations[self.phase]
+
+    @property
+    def total_iterations(self):
+        if self.use_paschalidou_loss:
+            return self.paschalidou_n_iterations
+        else:
+            return sum(self.n_iterations)
+
 params = TulsianiParams()
 
 params.train_dir = 'data/chamferData/01'
@@ -63,7 +77,7 @@ params.prob_factors = [0.0001, 0.2]
 params.existence_penalties = [.0, 8e-5]
 
 params.use_paschalidou_loss = True
-params.paschalidou_n_iterations = 50000
+params.paschalidou_n_iterations = 20000
 params.paschalidou_alpha = 1.
 params.paschalidou_beta = 1e-3
 

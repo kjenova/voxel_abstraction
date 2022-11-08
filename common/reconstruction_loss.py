@@ -39,13 +39,8 @@ def _consistency(volume, P, closest_points_grid, n_samples_per_primitive, expect
     primitive_points = primitive_to_world_space(primitive_points, P.quat, P.trans)
 
     weights = sampler.get_importance_weights(P.dims)
-
-    if expected_value:
-        weights /= P.dims.size(1) * weights.sum(-1, keepdim = True) + 1e-7
-        weights *= P.prob.unsqueeze(-1)
-    else:
-        weights *= P.exist.unsqueeze(-1)
-        weights /= weights.sum((1, 2), keepdim = True) + 1e-7
+    weights *= (P.prob if expected_value else P.exist).unsqueeze(-1)
+    weights /= weights.sum((1, 2), keepdim = True) + 1e-7
 
     i = point_indices(primitive_points, volume)
     closest_points = closest_points_grid.reshape(-1, 3)[i]
@@ -90,9 +85,22 @@ def paschalidou_reconstruction_loss(volume, P, shape_points, closest_points_grid
 
     return cov, cons
 
+def entropy_bernoulli(probs):
+    # Minimize the entropy of each bernoulli variable pushing them to either 1 or 0
+    sm = probs.new_tensor(1e-3)
+
+    t1 = torch.log(torch.max(probs, sm))
+    t2 = torch.log(torch.max(1 - probs, sm))
+
+    return (- probs * t1 - (1 - probs) * t2).sum(-1)
+
 def paschalidou_parsimony_loss(P, params):
     prob_sum = P.prob.sum(-1)
-    return F.relu(params.paschalidou_alpha * (1 - prob_sum)) + params.paschalidou_beta * prob_sum.sqrt()
+    lower_bound = F.relu(10 - prob_sum)
+
+    entropy = entropy_bernoulli(P.prob)
+
+    return (lower_bound + entropy).sum(-1)
 
 if __name__ == "__main__":
     from load_shapes import voxel_center_points

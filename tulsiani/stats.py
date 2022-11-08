@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 class TulsianiStats:
     def __init__(self, params):
-        self.n = sum(params.n_iterations)
+        self.n = params.total_iterations
         self.cov = np.zeros(self.n)
         self.cons = np.zeros(self.n)
         self.prob_means = np.zeros(self.n)
