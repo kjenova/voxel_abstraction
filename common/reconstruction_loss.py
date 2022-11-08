@@ -46,7 +46,7 @@ def _consistency(volume, P, closest_points_grid, n_samples_per_primitive, expect
     weights /= weights.sum((1, 2), keepdim = True) + 1e-7
 
     if expected_value:
-        weight *= P.prob.unsqueeze(-1)
+        weights *= P.prob.unsqueeze(-1)
 
     i = point_indices(primitive_points, volume)
     closest_points = closest_points_grid.reshape(-1, 3)[i]
