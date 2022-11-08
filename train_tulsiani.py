@@ -9,7 +9,7 @@ from tulsiani.reinforce import ReinforceRewardUpdater
 from tulsiani.stats import TulsianiStats
 
 from common.batch_provider import BatchProvider
-from common.reconstruction_loss import reconstruction_loss
+from common.reconstruction_loss import reconstruction_loss, paschalidou_reconstruction_loss, paschalidou_parsimony_loss
 
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
@@ -20,50 +20,73 @@ def train(network, train_batches, validation_batches, params, stats):
 
     best_validation_loss = float('inf')
 
+    if params.use_paschalidou_loss
+        n_iterations = params.paschalidou_n_iterations
+    else:
+        n_iterations = params.n_iterations[params.phase]
+
     network.train()
-    for _ in range(params.n_iterations[params.phase]):
+    for _ in range(n_iterations):
+        i = train_batches.iteration - 1
+
         optimizer.zero_grad()
 
         volume, sampled_points, closest_points = train_batches.get()
         P = network(volume)
-        cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params.n_samples_per_primitive)
-        loss = cov + cons
 
-        total_penalty = .0
+        if params.use_paschalidou_loss:
+            cov, cons = paschalidou_reconstruction_loss(volume, P, sampled_points, closest_points, params)
+            parsimony = paschalidou_parsimony_loss(P, params)
 
-        if params.prune_primitives:
-            # Pri nas se minimizira 'penalty', čeprav se pri REINFORCE tipično maksimizira 'reward'.
-            # Edina razlika je v tem, da bi v primeru, da bi maksimizirali 'reward = - penalty', morali
-            # potem še pri gradientu dodati minus.
-            for p in range(params.n_primitives):
-                penalty = loss + params.existence_penalty * P.exist[:, p]
-                total_penalty += penalty.mean().item()
-                P.log_prob[:, p] *= reinforce_updater.update(penalty)
+            (cov + cons + parsimony).mean().backward()
 
-            # Ker je navaden loss reduciran z .mean(), tudi ta "REINFORCE loss" reduciram z .mean():
-            (loss.mean() + P.log_prob.mean()).backward()
+            optimizer.step()
+
+            stats.parsimony[i] = parsimony.mean()
         else:
-            loss.mean().backward()
+            cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params.n_samples_per_primitive)
+            loss = cov + cons
 
-        optimizer.step()
+            total_penalty = .0
 
-        i = train_batches.iteration - 1
+            if params.prune_primitives:
+                # Pri nas se minimizira 'penalty', čeprav se pri REINFORCE tipično maksimizira 'reward'.
+                # Edina razlika je v tem, da bi v primeru, da bi maksimizirali 'reward = - penalty', morali
+                # potem še pri gradientu dodati minus.
+                for p in range(params.n_primitives):
+                    penalty = loss + params.existence_penalty * P.exist[:, p]
+                    total_penalty += penalty.mean().item()
+                    P.log_prob[:, p] *= reinforce_updater.update(penalty)
+
+                # Ker je navaden loss reduciran z .mean(), tudi ta "REINFORCE loss" reduciram z .mean():
+                (loss.mean() + P.log_prob.mean()).backward()
+            else:
+                loss.mean().backward()
+
+            optimizer.step()
+
+            stats.prob_means[i] = P.prob.mean()
+            stats.penalty_means[i] = total_penalty / params.n_primitives
+
         stats.cov[i] = cov.mean()
         stats.cons[i] = cons.mean()
-        stats.prob_means[i] = P.prob.mean()
-        stats.penalty_means[i] = total_penalty / params.n_primitives
         i += 1
 
         if i % params.save_iteration == 0:
             cov_mean = stats.cov[i - params.save_iteration : i].mean()
             cons_mean = stats.cons[i - params.save_iteration : i].mean()
+            mean_parsimony = stats.parsimony[i - params.save_iteration : i].mean()
             mean_prob = stats.prob_means[i - params.save_iteration : i].mean()
             mean_penalty = stats.penalty_means[i - params.save_iteration : i].mean()
 
             print(f'---- iteration {i} ----')
-            print(f'    loss {cov_mean + cons_mean}, cov: {cov_mean}, cons: {cons_mean}')
-            print(f'    mean prob: {mean_prob}')
-            print(f'    mean penalty: {mean_penalty}')
+            print(f'    loss {cov_mean + cons_mean + parsimony_mean}, cov: {cov_mean}, cons: {cons_mean}')
+
+            if self.use_paschalidou_loss:
+                print(f'    parsimony {parsimony_mean}')
+            else:
+                print(f'    mean prob: {mean_prob}')
+                print(f'    mean penalty: {mean_penalty}')
 
             validation_loss = .0
 
@@ -72,8 +95,15 @@ def train(network, train_batches, validation_batches, params, stats):
             with torch.no_grad():
                 for (volume, sampled_points, closest_points) in validation_batches.get_all_batches():
                     P = network(volume)
-                    cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params.n_samples_per_primitive)
-                    validation_loss += (cov + cons).sum() # .sum() zato, ker kasneje delimo.
+
+                    if self.use_paschalidou_loss:
+                        cov, cons = paschalidou_reconstruction_loss(volume, P, sampled_points, closest_points, params)
+                        parsimony = paschalidou_parsimony_loss(P, params)
+
+                        validation_loss += (cov + cons + parsimony).sum()
+                    else:
+                        cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params.n_samples_per_primitive)
+                        validation_loss += (cov + cons).sum() # .sum() zato, ker kasneje delimo.
 
             network.train()
 
@@ -111,12 +141,13 @@ network.to(params.device)
 
 train(network, train_batches, validation_batches, params, stats)
 
-params.phase = 1
-network = TulsianiNetwork(params)
-network.load_state_dict(torch.load('results/tulsiani/save.torch'))
-scale_weights(network, params)
-network.to(params.device)
+if not params.use_paschalidou_loss:
+    params.phase = 1
+    network = TulsianiNetwork(params)
+    network.load_state_dict(torch.load('results/tulsiani/save.torch'))
+    scale_weights(network, params)
+    network.to(params.device)
 
-train(network, train_batches, validation_batches, params, stats)
+    train(network, train_batches, validation_batches, params, stats)
 
 stats.save_plots('results/tulsiani/graphs')

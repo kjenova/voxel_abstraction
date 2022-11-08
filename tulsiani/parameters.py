@@ -62,4 +62,9 @@ params.prob_factors = [0.0001, 0.2]
 # V drugi fazi tudi rahlo penaliziramo prisotnost.
 params.existence_penalties = [.0, 8e-5]
 
+params.use_paschalidou_loss = True
+params.paschalidou_n_iterations = 50000
+params.paschalidou_alpha = 1.
+params.paschalidou_beta = 1e-3
+
 params.device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')

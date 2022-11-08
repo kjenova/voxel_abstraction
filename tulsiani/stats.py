@@ -9,6 +9,9 @@ class TulsianiStats:
         self.prob_means = np.zeros(self.n)
         self.penalty_means = np.zeros(self.n)
 
+        self.use_paschalidou_loss = params.use_paschalidou_loss
+        self.parsimony = np.zeros(self.n)
+
         self.m = self.n // params.save_iteration
         self.validation_loss = np.zeros(self.m)
 
@@ -28,8 +31,16 @@ class TulsianiStats:
         plt.ylabel('consistency')
         plt.savefig(f'{directory}/consistency.png')
 
+        if self.use_paschalidou_loss:
+            plt.clf()
+            plt.figure(figsize = (20, 5))
+            plt.plot(x, self.parsimony)
+            plt.xlabel('iteration')
+            plt.ylabel('parsimony')
+            plt.savefig(f'{directory}/parsimony.png')
+
         plt.figure(figsize = (20, 5))
-        plt.plot(x[save_iteration:], (self.cov + self.cons)[save_iteration:], label = 'train')
+        plt.plot(x[save_iteration:], (self.cov + self.cons + self.parsimony)[save_iteration:], label = 'train')
         v = np.arange(save_iteration, self.n + 1, save_iteration)
         plt.plot(v, self.validation_loss, label = 'validation')
         plt.xlabel('iteration')
@@ -44,9 +55,10 @@ class TulsianiStats:
         plt.ylabel('mean probability')
         plt.savefig(f'{directory}/probability.png')
 
-        plt.clf()
-        plt.figure(figsize = (20, 5))
-        plt.plot(x, self.penalty_means)
-        plt.xlabel('iteration')
-        plt.ylabel('penalty')
-        plt.savefig(f'{directory}/penalty.png')
+        if not self.use_paschalidou_loss:
+            plt.clf()
+            plt.figure(figsize = (20, 5))
+            plt.plot(x, self.penalty_means)
+            plt.xlabel('iteration')
+            plt.ylabel('penalty')
+            plt.savefig(f'{directory}/penalty.png')
