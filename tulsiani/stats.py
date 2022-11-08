@@ -7,6 +7,8 @@ class TulsianiStats:
         self.cov = np.zeros(self.n)
         self.cons = np.zeros(self.n)
         self.prob_means = np.zeros(self.n)
+        self.dim_means = np.zeros(self.n)
+        self.trans_stds = np.zeros(self.n)
         self.penalty_means = np.zeros(self.n)
 
         self.use_paschalidou_loss = params.use_paschalidou_loss
@@ -55,6 +57,20 @@ class TulsianiStats:
         plt.xlabel('iteration')
         plt.ylabel('mean probability')
         plt.savefig(f'{directory}/probability.png')
+
+        plt.clf()
+        plt.figure(figsize = (20, 5))
+        plt.plot(x, self.prob_means)
+        plt.xlabel('iteration')
+        plt.ylabel('mean dimensions')
+        plt.savefig(f'{directory}/dimensions.png')
+
+        plt.clf()
+        plt.figure(figsize = (20, 5))
+        plt.plot(x, self.prob_means)
+        plt.xlabel('iteration')
+        plt.ylabel('standard deviation of translations')
+        plt.savefig(f'{directory}/translations.png')
 
         if not self.use_paschalidou_loss:
             plt.clf()

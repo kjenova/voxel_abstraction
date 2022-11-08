@@ -63,6 +63,8 @@ def train(network, train_batches, validation_batches, params, stats):
             stats.penalty_means[i] = total_penalty / params.n_primitives
 
         stats.prob_means[i] = P.prob.mean()
+        stats.dim_means[i] = P.dims.mean()
+        stats.trans_stds[i] = P.trans.std((0, 1)).mean()
         stats.cov[i] = cov.mean()
         stats.cons[i] = cons.mean()
         i += 1
@@ -72,11 +74,13 @@ def train(network, train_batches, validation_batches, params, stats):
             cons_mean = stats.cons[i - params.save_iteration : i].mean()
             parsimony_mean = stats.parsimony[i - params.save_iteration : i].mean()
             mean_prob = stats.prob_means[i - params.save_iteration : i].mean()
+            mean_dim = stats.dim_means[i - params.save_iteration : i].mean()
+            mean_trans_std = stats.trans_stds[i - params.save_iteration : i].mean()
             mean_penalty = stats.penalty_means[i - params.save_iteration : i].mean()
 
             print(f'---- iteration {i} ----')
             print(f'    loss {cov_mean + cons_mean + parsimony_mean}, cov: {cov_mean}, cons: {cons_mean}')
-            print(f'    mean prob: {mean_prob}')
+            print(f'    mean prob: {mean_prob}, mean dim: {mean_dim}, trans std: {mean_trans_std}')
 
             if params.use_paschalidou_loss:
                 print(f'    parsimony {parsimony_mean}')
@@ -119,7 +123,7 @@ try:
 except FileExistsError:
     pass
 
-train_set = load_preprocessed(params.train_dir)
+train_set = load_preprocessed(params.train_dir, 32)
 
 params.grid_size = train_set[0].resized_volume.shape[0]
 
