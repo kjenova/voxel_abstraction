@@ -60,14 +60,14 @@ class TulsianiStats:
 
         plt.clf()
         plt.figure(figsize = (20, 5))
-        plt.plot(x, self.prob_means)
+        plt.plot(x, self.dim_means)
         plt.xlabel('iteration')
         plt.ylabel('mean dimensions')
         plt.savefig(f'{directory}/dimensions.png')
 
         plt.clf()
         plt.figure(figsize = (20, 5))
-        plt.plot(x, self.prob_means)
+        plt.plot(x, self.trans_stds)
         plt.xlabel('iteration')
         plt.ylabel('standard deviation of translations')
         plt.savefig(f'{directory}/translations.png')

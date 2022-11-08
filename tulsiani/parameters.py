@@ -77,7 +77,7 @@ params.prob_factors = [0.0001, 0.2]
 params.existence_penalties = [.0, 8e-5]
 
 params.use_paschalidou_loss = True
-params.paschalidou_n_iterations = 20000
+params.paschalidou_n_iterations = 15000
 params.paschalidou_alpha = 1.
 params.paschalidou_beta = 1e-3
 
