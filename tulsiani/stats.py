@@ -12,7 +12,8 @@ class TulsianiStats:
         self.use_paschalidou_loss = params.use_paschalidou_loss
         self.parsimony = np.zeros(self.n)
 
-        self.m = self.n // params.save_iteration
+        self.save_iteration = params.save_iteration
+        self.m = self.n // self.save_iteration
         self.validation_loss = np.zeros(self.m)
 
     def save_plots(self, directory):
@@ -40,8 +41,8 @@ class TulsianiStats:
             plt.savefig(f'{directory}/parsimony.png')
 
         plt.figure(figsize = (20, 5))
-        plt.plot(x[save_iteration:], (self.cov + self.cons + self.parsimony)[save_iteration:], label = 'train')
-        v = np.arange(save_iteration, self.n + 1, save_iteration)
+        plt.plot(x[self.save_iteration:], (self.cov + self.cons + self.parsimony)[self.save_iteration:], label = 'train')
+        v = np.arange(self.save_iteration, self.n + 1, self.save_iteration)
         plt.plot(v, self.validation_loss, label = 'validation')
         plt.xlabel('iteration')
         plt.ylabel('loss')
