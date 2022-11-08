@@ -99,11 +99,11 @@ def entropy_bernoulli(probs):
     t1 = torch.log(torch.max(probs, sm))
     t2 = torch.log(torch.max(1 - probs, sm))
 
-    return (- probs * t1 - (1 - probs) * t2).sum(-1)
+    return (- probs * t1 - (1 - probs) * t2).mean(-1)
 
 def paschalidou_parsimony_loss(P, params):
     prob_sum = P.prob.sum(-1)
-    lower_bound = F.relu(10 - prob_sum)
+    lower_bound = F.relu(4 - prob_sum)
 
     entropy = entropy_bernoulli(P.prob)
 
