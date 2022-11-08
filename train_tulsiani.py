@@ -65,9 +65,9 @@ def train(network, train_batches, validation_batches, params, stats):
 
             optimizer.step()
 
-            stats.prob_means[i] = P.prob.mean()
             stats.penalty_means[i] = total_penalty / params.n_primitives
 
+        stats.prob_means[i] = P.prob.mean()
         stats.cov[i] = cov.mean()
         stats.cons[i] = cons.mean()
         i += 1
@@ -81,11 +81,11 @@ def train(network, train_batches, validation_batches, params, stats):
 
             print(f'---- iteration {i} ----')
             print(f'    loss {cov_mean + cons_mean + parsimony_mean}, cov: {cov_mean}, cons: {cons_mean}')
+            print(f'    mean prob: {mean_prob}')
 
             if params.use_paschalidou_loss:
                 print(f'    parsimony {parsimony_mean}')
             else:
-                print(f'    mean prob: {mean_prob}')
                 print(f'    mean penalty: {mean_penalty}')
 
             validation_loss = .0
