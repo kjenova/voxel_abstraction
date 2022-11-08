@@ -40,7 +40,7 @@ params.n_iterations = [20000, 30000]
 # ker potem še za vsako iteracijo vzorčimo podmnožico točk na površini oblike.)
 params.repeat_batch_n_iterations = 2
 # Na vsake toliko iteracij se shrani model, če je validacijski loss manjši:
-params.save_iteration = 10 # 1000
+params.save_iteration = 1000
 
 # Ali napovedujemo prisotnost primitivov (True) ali pa kar vedno vzamemo vse (False):
 params.prune_primitives = True
@@ -77,7 +77,7 @@ params.prob_factors = [0.0001, 0.2]
 params.existence_penalties = [.0, 8e-5]
 
 params.use_paschalidou_loss = True
-params.paschalidou_n_iterations = 20 # 20000
+params.paschalidou_n_iterations = 20000
 params.paschalidou_alpha = 1.
 params.paschalidou_beta = 1e-3
 
