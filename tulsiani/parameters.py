@@ -3,11 +3,11 @@ import torch
 class TulsianiParams:
     @property
     def dims_factor(self):
-        return self.dims_factors[self.phase]
+        return 1 if self.use_paschalidou_loss else self.dims_factors[self.phase]
 
     @property
     def prob_factor(self):
-        return self.prob_factors[self.phase]
+        return 1 if self.use_paschalidou_loss else self.prob_factors[self.phase]
 
     @property
     def existence_penalty(self):
