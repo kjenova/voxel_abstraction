@@ -8,7 +8,7 @@ def points_to_primitives_distance_squared(P, shape_points):
     [b, p] = P.dims.size()[:2]
     n = shape_points.size(1)
     points = shape_points.unsqueeze(1).repeat(1, p, 1, 1)
-    point = world_to_primitive_space(points, P.quat, P.trans)
+    points = world_to_primitive_space(points, P.quat, P.trans)
 
     dims = P.dims.unsqueeze(2).repeat(1, 1, n, 1)
     return F.relu(points.abs() - dims).pow(2).sum(-1)
