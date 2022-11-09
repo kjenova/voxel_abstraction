@@ -64,7 +64,7 @@ def train(network, train_batches, validation_batches, params, stats):
 
         stats.prob_means[i] = P.prob.mean()
         stats.dim_means[i] = P.dims.mean()
-        stats.trans_stds[i] = P.trans.std(0).mean()
+        stats.trans_stds[i] = P.trans.std(1).mean()
         stats.cov[i] = cov.mean()
         stats.cons[i] = cons.mean()
         i += 1
