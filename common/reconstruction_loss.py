@@ -112,12 +112,14 @@ def paschalidou_parsimony_loss(P, params):
     return (lower_bound + entropy).mean(-1)
 
 if __name__ == "__main__":
-    from load_shapes import voxel_center_points
+    def voxel_center_points(n):
+        c = torch.linspace(-.5 + .5 / n, .5 - .5 / n, n)
+        return torch.cartesian_prod(c, c, c)
 
     def test_point_indices():
         p = 5
         volume = torch.zeros(2, 3, 3, 3)
-        points = voxel_center_points([3, 3, 3]).reshape(1, 1, 27, 3).repeat(2, p, 1, 1)
+        points = voxel_center_points(3).reshape(1, 1, 27, 3).repeat(2, p, 1, 1)
         indices = point_indices(points, volume)
 
         target_indices = torch.arange(0, 2 * 3 * 3 * 3).reshape(2, -1, 1).repeat(1, p, 1)
@@ -144,7 +146,12 @@ if __name__ == "__main__":
         distance += 10 * (1 - exist.unsqueeze(-1))
         assert distance.mean() < 1e-4, 'coverage is incorrect'
 
-    from primitives import Primitives
+    class Primitives:
+        def __init__(self, dims, quat, trans, exist):
+            self.dims = dims
+            self.quat = quat
+            self.trans = trans
+            self.exist = exist
 
     def test_consistency():
         grid_size = 5
@@ -161,7 +168,7 @@ if __name__ == "__main__":
                     trans = (trans + .5) / grid_size - .5
                     P = Primitives(dims, quat, trans, exist)
 
-                    cons, _ = _consistency(volume, P, CuboidSurface(150), closest_points_grid)
+                    cons, _ = _consistency(volume, P, closest_points_grid, 150)
                     cons = cons.mean()
                     distance = (trans.reshape(3) - closest_points_grid[0, i, j, k]).pow(2).sum()
                     assert torch.allclose(cons, distance), 'consistency is incorrect'
