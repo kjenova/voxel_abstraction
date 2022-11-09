@@ -86,9 +86,11 @@ def paschalidou_reconstruction_loss(volume, P, shape_points, closest_points_grid
     # Verjetnost, da je k-ti primitiv najbližji.
     minprob = sorted_prob * neg_cumprod
 
-    cov = (sorted_distance * minprob).mean((1, 2))
+    cov = (sorted_distance * minprob).sum(-1).mean(1)
 
-    cons = consistency(volume, P, closest_points_grid, params.n_samples_per_primitive, True)
+    # print((cov - coverage(P, shape_points)).abs().mean())
+
+    cons = consistency(volume, P, closest_points_grid, params.n_samples_per_primitive, False)
 
     return cov, cons
 
