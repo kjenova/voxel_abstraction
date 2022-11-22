@@ -48,10 +48,7 @@ volume_meshes = [pv.wrap(Trimesh(test[i].vertices, test[i].faces - 1)) for i in 
 best_angles = []
 for volume_mesh in volume_meshes:
     volume_actor = p.add_mesh(volume_mesh)
-    predictions_actor = p.add_mesh(predictions_mesh, scalars = "colors", rgb = True)
-
     _, best_angle = bruteforce_view(p, n_angles)
-
     p.remove_actor(volume_actor)
 
     best_angles.append(best_angle)
@@ -59,7 +56,8 @@ for volume_mesh in volume_meshes:
 def plot_predictions(X, method):
     plot = Image.new('RGB', (plot_image_width, plot_image_height), (0, 0, 0))
 
-    for i, volume_mesh in enumerate():
+    predictions_vertices = predictions_to_mesh_vertices(X)
+    for i, volume_mesh in enumerate(volume_meshes):
         v = predictions_vertices[i, X.prob[i].cpu() > prob_threshold].numpy()
         predictions_mesh = prediction_vertices_to_mesh(v)
 

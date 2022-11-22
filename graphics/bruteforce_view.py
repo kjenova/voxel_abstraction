@@ -19,13 +19,10 @@ def up_vector_on_sphere(v):
 
 max_shape_radius = np.sqrt(3) / 2 + 1e-4
 
-def rotate_scene(p, e, a, transparent = False, camera_radius = 3.):
+def rotate_scene(p, elevation, azimuth, transparent = False, camera_radius = 3.):
     p.store_image = True
 
     clipping_range = (camera_radius - max_shape_radius, camera_radius + 2 * max_shape_radius)
-
-    elevation = e * np.pi / n_angles # [0, pi)
-    azimuth = a * 2 * np.pi / n_angles # [0, 2pi)
 
     position = camera_radius * to_cartesian(elevation, azimuth)
     up = up_vector_on_sphere(position)
@@ -40,10 +37,8 @@ def rotate_scene(p, e, a, transparent = False, camera_radius = 3.):
 
     return image
 
-# Scena je tako zarotirana, da je slika čimbolj zapolnjena.
+# Scena je zarotirana tako, da je slika čimbolj zapolnjena.
 def bruteforce_view(p, n_angles, transparent = False):
-    clipping_range = (camera_radius - max_shape_radius, camera_radius + 2 * max_shape_radius)
-
     p.store_image = True
 
     best_image = None
@@ -52,13 +47,16 @@ def bruteforce_view(p, n_angles, transparent = False):
 
     for e in range(n_angles):
         for a in range(n_angles):
-            image = rotate_scene(p, e, a, transparent)
+            elevation = e * np.pi / n_angles # [0, pi)
+            azimuth = a * 2 * np.pi / n_angles # [0, 2pi)
+
+            image = rotate_scene(p, elevation, azimuth, transparent)
             depth = p.get_image_depth()
 
             n_empty_pixels = np.isnan(depth).sum()
             if n_empty_pixels < min_n_empty_pixels:
                 min_n_empty_pixels = n_empty_pixels
                 best_image = image
-                best_angles = (e, a)
+                best_angles = (elevation, azimuth)
 
     return best_image, best_angles
