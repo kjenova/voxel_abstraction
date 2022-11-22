@@ -56,7 +56,7 @@ for volume_mesh in volume_meshes:
 def plot_predictions(X, method):
     plot = Image.new('RGB', (plot_image_width, plot_image_height), (0, 0, 0))
 
-    predictions_vertices = predictions_to_mesh_vertices(X)
+    predictions_vertices = predictions_to_mesh_vertices(X).cpu()
     for i, volume_mesh in enumerate(volume_meshes):
         v = predictions_vertices[i, X.prob[i].cpu() > prob_threshold].numpy()
         predictions_mesh = prediction_vertices_to_mesh(v)
