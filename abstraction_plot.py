@@ -4,14 +4,15 @@ from trimesh import Trimesh
 from PIL import Image
 import pyvista as pv
 
-from tulsiani.inference import inference
+from tulsiani.inference import inference as tulsiani_inference
+from yang.inference import inference as yang_inference
 
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
 
 from common.transform import predictions_to_mesh_vertices
 from graphics.write_mesh import cuboid_faces
-from graphics.bruteforce_view import bruteforce_view
+from graphics.bruteforce_view import rotate_scene, bruteforce_view
 from graphics.colors import colors
 
 from tulsiani.parameters import params
@@ -41,30 +42,44 @@ def prediction_vertices_to_mesh(vertices):
 
 _, test = load_urocell_preprocessed(params.urocell_dir)
 
-images = []
 p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 
-X = inference(test)[0]
-predictions_vertices = predictions_to_mesh_vertices(X)
-for i in range(10):
-    volume_mesh = pv.wrap(Trimesh(test[i].vertices, test[i].faces - 1))
-
-    v = predictions_vertices[i, X.prob[i].cpu() > prob_threshold].numpy()
-    predictions_mesh = prediction_vertices_to_mesh(v)
-
-    volume_actor = p.add_mesh(volume_mesh, opacity = .5)
+volume_meshes = [pv.wrap(Trimesh(test[i].vertices, test[i].faces - 1)) for i in range(10)]
+best_angles = []
+for volume_mesh in volume_meshes:
+    volume_actor = p.add_mesh(volume_mesh)
     predictions_actor = p.add_mesh(predictions_mesh, scalars = "colors", rgb = True)
-    best_image = bruteforce_view(p, n_angles)
+
+    _, best_angle = bruteforce_view(p, n_angles)
+
     p.remove_actor(volume_actor)
-    p.remove_actor(predictions_actor)
 
-    images.append(best_image)
+    best_angles.append(best_angle)
 
-plot = Image.new('RGB', (plot_image_width, plot_image_height), (0, 0, 0))
+def plot_predictions(X, method):
+    plot = Image.new('RGB', (plot_image_width, plot_image_height), (0, 0, 0))
 
-for i in range(2):
-    for j in range(5):
-        image = images[i * 5 + j]
-        plot.paste(image, box = (j * shape_image_size, i * shape_image_size))
+    for i, volume_mesh in enumerate():
+        v = predictions_vertices[i, X.prob[i].cpu() > prob_threshold].numpy()
+        predictions_mesh = prediction_vertices_to_mesh(v)
 
-plot.save('results/tulsiani/abstraction_tulsiani.png')
+        volume_actor = p.add_mesh(volume_mesh, opacity = .5)
+        predictions_actor = p.add_mesh(predictions_mesh, scalars = "colors", rgb = True)
+
+        k = i % 5
+        j = i // 5
+        image = rotate_scene(p, *best_angles[i])
+        plot.paste(image, box = (k * shape_image_size, j * shape_image_size))
+
+        p.remove_actor(volume_actor)
+        p.remove_actor(predictions_actor)
+
+    plot.save(f'results/{method}/abstraction_{method}.png')
+
+X = tulsiani_inference(test)
+if X is not None:
+    plot_predictions(X[0], 'tulsiani')
+
+X = yang_inference(test)
+if X is not None:
+    plot_predictions(X[0], 'yang')

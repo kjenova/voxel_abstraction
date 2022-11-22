@@ -1,3 +1,4 @@
+import os
 import torch
 
 from tulsiani.parameters import params
@@ -7,8 +8,12 @@ def inference(dataset):
     params.grid_size = dataset[0].resized_volume.shape[0]
     params.phase = 0 if params.use_paschalidou_loss else 1
 
+    path = 'results/tulsiani/save.torch'
+    if not os.path.exists(path):
+        return None
+
     model = TulsianiNetwork(params)
-    model.load_state_dict(torch.load('results/tulsiani/save.torch'))
+    model.load_state_dict(torch.load(path))
     model.eval()
 
     results = []

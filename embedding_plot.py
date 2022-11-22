@@ -40,7 +40,7 @@ for i, shape in enumerate(dataset):
     mesh = pv.wrap(Trimesh(shape.vertices, shape.faces - 1))
 
     mesh_actor = p.add_mesh(mesh)
-    best_image = bruteforce_view(p, n_angles, transparent = True)
+    best_image, _ = bruteforce_view(p, n_angles, transparent = True)
     p.remove_actor(mesh_actor)
 
     images.append(best_image)

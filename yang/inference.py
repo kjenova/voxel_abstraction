@@ -18,6 +18,9 @@ def inference(dataset):
             max_iter = it
             model_path = filename
 
+    if model_path is None:
+        return None
+
     model = Network_Whole(hypara).cuda()
     model.load_state_dict(torch.load(model_path))
     model.eval()
