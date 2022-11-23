@@ -256,6 +256,7 @@ class Network_Whole(nn.Module):
         x_per, x_cuboid, z, mu, log_var = self.Feature_extract(pc)
         scale, rotate_quat, trans, exist = self.Para_pred(x_cuboid)
         rotate = quat2mat(F.normalize(rotate_quat,dim=2,p=2))
+        rotate_quat = F.normalize(rotate_quat, dim = -1)
 
         verts_untranslated = self.cube_vert.unsqueeze(0).unsqueeze(0).repeat(batch_size,self.num_cuboid,1,1) * scale.unsqueeze(2).repeat(1,1,8,1)
         verts_untranslated = torch.einsum('abcd,abde->abce',rotate, verts_untranslated.permute(0,1,3,2)).permute(0,1,3,2)
