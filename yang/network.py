@@ -44,7 +44,12 @@ class Feature_extract(nn.Module):
             self.fc_mu  = nn.Linear(self.emb_dims, self.z_dims)
             self.fc_var = nn.Linear(self.emb_dims, self.z_dims)
 
-        if not self.separate_primitive_encoding:
+        if self.separate_primitive_encoding:
+            self.conv_cuboid = nn.Sequential(nn.Conv1d(self.z_dims, 256, kernel_size=1, bias=False),
+                                             nn.LeakyReLU(negative_slope=0.2, inplace = True),
+                                             nn.Conv1d(256, 128, kernel_size=1, bias=False),
+                                             nn.LeakyReLU(negative_slope=0.2, inplace = True))
+        else:
             self.enc_cuboid_vec = nn.Sequential(nn.Conv1d(self.num_cuboid, 64, kernel_size=1, bias=False),
                                                 nn.LeakyReLU(negative_slope=0.2, inplace = True))
             self.conv_cuboid = nn.Sequential(nn.Conv1d(self.z_dims + 64, 256, kernel_size=1, bias=False),
@@ -136,7 +141,7 @@ class Feature_extract(nn.Module):
             z = self.reparameterize(mu, log_var).unsqueeze(-1)
 
         if self.separate_primitive_encoding:
-            x_cuboid = z
+            x_cuboid = self.conv_cuboid(z)
         else:
             cuboid_vec = self.cuboid_vector.unsqueeze(0).repeat(batch_size,1,1)           # (batch_size, num_cuboid, num_cuboid)
             cuboid_vec = self.enc_cuboid_vec(cuboid_vec)                                  # (batch_size, 64, num_cuboid)
@@ -158,14 +163,14 @@ class Para_pred(nn.Module):
         nn.init.zeros_(self.conv_scale.bias)
 
         self.conv_rotate = nn.Conv1d(128, n * 4, kernel_size=1)
-        self.conv_rotate.bias.data = torch.Tensor([1, 0, 0, 0]).unsqueeze(0).repeat(n, 1)
+        self.conv_rotate.bias.data = torch.Tensor([1, 0, 0, 0]).repeat(n)
 
         self.conv_trans = nn.Conv1d(128, n * 3, kernel_size=1)
         nn.init.zeros_(self.conv_trans.bias)
 
-        self.conv_ext =   nn.Sequential(nn.Conv1d(128, 32, kernel_size=1, bias=True),
-                                        nn.LeakyReLU(negative_slope=0.2, inplace = True),
-                                        nn.Conv1d(32, n, kernel_size=1, bias=True))
+        self.conv_ext = nn.Sequential(nn.Conv1d(128, 32, kernel_size=1, bias=True),
+                                      nn.LeakyReLU(negative_slope=0.2, inplace = True),
+                                      nn.Conv1d(32, n, kernel_size=1, bias=True))
 
     def forward(self, x_cuboid):
         scale = self.conv_scale(x_cuboid).transpose(2, 1)    # (batch_size, num_cuboid, 3)
@@ -227,7 +232,7 @@ class Network_Whole(nn.Module):
             k = self.k,
             num_cuboid = self.num_cuboid,
             low_dim_idx = self.low_dim_idx,
-            nonvariational = self.nonvariational
+            nonvariational = self.nonvariational,
             separate_primitive_encoding = self.separate_primitive_encoding
         )
 
@@ -271,6 +276,10 @@ class Network_Whole(nn.Module):
         # scale B * N * 3
         x_per, x_cuboid, z, mu, log_var = self.Feature_extract(pc)
         scale, rotate_quat, trans, exist = self.Para_pred(x_cuboid)
+
+        if self.separate_primitive_encoding:
+            x_cuboid = x_cuboid.repeat(1, 1, self.num_cuboid)
+
         rotate = quat2mat(F.normalize(rotate_quat,dim=2,p=2))
         rotate_quat = F.normalize(rotate_quat, dim = -1)
 
