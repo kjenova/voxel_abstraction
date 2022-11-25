@@ -28,6 +28,9 @@ parser.add_argument('--N_dim_z', default = 512, type = int, help = 'Dimension of
 parser.add_argument('--N_dim_att', default = 64, type = int, help = 'Dimension of query and key in attention')
 parser.add_argument('--N_num_cubes', default = 16, type = int, help = 'Number of cuboids')
 parser.add_argument('--N_nonvariational_network', action = 'store_true')
+# Da nimamo samo enega linearnega sloja, ki iz globalnih značilk + one-hot encoding-a indeksa primitiva
+# napove parametre primitiva, ampak da tako kot v Tulsiani et al. parametre napovemo za vsak primitiv posebej.
+parser.add_argument('--N_separate_primitive_encoding', action = 'store_true')
 
 # Weight(W) hyper-parameters of losses
 # Če je ta flag nastavljen, se za reconstruction loss uporablja loss iz Tulsiani in sod., drugače

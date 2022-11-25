@@ -7,7 +7,7 @@ from .utils_pytorch import quat2mat
 
 ##########################################################################################################################
 class Feature_extract(nn.Module):
-    def __init__(self, emb_dims, z_dims, k, num_cuboid, low_dim_idx, nonvariational):
+    def __init__(self, emb_dims, z_dims, k, num_cuboid, low_dim_idx, nonvariational, separate_primitive_encoding):
         super(Feature_extract, self).__init__()
         self.emb_dims = emb_dims
         self.z_dims = z_dims
@@ -15,6 +15,7 @@ class Feature_extract(nn.Module):
         self.num_cuboid = num_cuboid
         self.low_dim_idx = low_dim_idx
         self.nonvariational = nonvariational
+        self.separate_primitive_encoding = separate_primitive_encoding
         self.cuboid_vector = torch.eye(self.num_cuboid).float().cuda().detach()
         self.bn1_1 = nn.BatchNorm2d(64)
         self.bn1_2 = nn.BatchNorm2d(64)
@@ -43,12 +44,13 @@ class Feature_extract(nn.Module):
             self.fc_mu  = nn.Linear(self.emb_dims, self.z_dims)
             self.fc_var = nn.Linear(self.emb_dims, self.z_dims)
 
-        self.enc_cuboid_vec = nn.Sequential(nn.Conv1d(self.num_cuboid, 64, kernel_size=1, bias=False),
-                                            nn.LeakyReLU(negative_slope=0.2, inplace = True))
-        self.conv_cuboid = nn.Sequential(nn.Conv1d(self.z_dims + 64, 256, kernel_size=1, bias=False),
-                                         nn.LeakyReLU(negative_slope=0.2, inplace = True),
-                                         nn.Conv1d(256, 128, kernel_size=1, bias=False),
-                                         nn.LeakyReLU(negative_slope=0.2, inplace = True))
+        if not self.separate_primitive_encoding:
+            self.enc_cuboid_vec = nn.Sequential(nn.Conv1d(self.num_cuboid, 64, kernel_size=1, bias=False),
+                                                nn.LeakyReLU(negative_slope=0.2, inplace = True))
+            self.conv_cuboid = nn.Sequential(nn.Conv1d(self.z_dims + 64, 256, kernel_size=1, bias=False),
+                                             nn.LeakyReLU(negative_slope=0.2, inplace = True),
+                                             nn.Conv1d(256, 128, kernel_size=1, bias=False),
+                                             nn.LeakyReLU(negative_slope=0.2, inplace = True))
 
     def knn(self, x, k):
         inner = -2*torch.matmul(x.transpose(2, 1), x)
@@ -133,31 +135,37 @@ class Feature_extract(nn.Module):
 
             z = self.reparameterize(mu, log_var).unsqueeze(-1)
 
-        cuboid_vec = self.cuboid_vector.unsqueeze(0).repeat(batch_size,1,1)           # (batch_size, num_cuboid, num_cuboid)
-        cuboid_vec = self.enc_cuboid_vec(cuboid_vec)                                  # (batch_size, 64, num_cuboid)
+        if self.separate_primitive_encoding:
+            x_cuboid = z
+        else:
+            cuboid_vec = self.cuboid_vector.unsqueeze(0).repeat(batch_size,1,1)           # (batch_size, num_cuboid, num_cuboid)
+            cuboid_vec = self.enc_cuboid_vec(cuboid_vec)                                  # (batch_size, 64, num_cuboid)
 
-        x_cuboid = torch.cat((z.repeat(1,1,self.num_cuboid),cuboid_vec),dim=1)        # (batch_size, emb_dims + 64, num_cuboid)
-        x_cuboid = self.conv_cuboid(x_cuboid)                                         # (batch_size, 128, num_points)  
+            x_cuboid = torch.cat((z.repeat(1,1,self.num_cuboid),cuboid_vec),dim=1)        # (batch_size, emb_dims + 64, num_cuboid)
+            x_cuboid = self.conv_cuboid(x_cuboid)                                         # (batch_size, 128, num_points)  
 
         return x_per, x_cuboid, z, mu, log_var
 
 ##########################################################################################################################
 class Para_pred(nn.Module):
-    def __init__(self):
+    def __init__(self, separate_primitive_encoding, num_cuboid):
         super(Para_pred, self).__init__()
 
-        self.conv_scale = nn.Conv1d(128, 3, kernel_size=1)
+        self.separate_primitive_encoding = separate_primitive_encoding
+        n = num_cuboid if self.separate_primitive_encoding else 1
+
+        self.conv_scale = nn.Conv1d(128, n * 3, kernel_size=1)
         nn.init.zeros_(self.conv_scale.bias)
 
-        self.conv_rotate = nn.Conv1d(128, 4, kernel_size=1)
-        self.conv_rotate.bias.data = torch.Tensor([1, 0, 0, 0])
+        self.conv_rotate = nn.Conv1d(128, n * 4, kernel_size=1)
+        self.conv_rotate.bias.data = torch.Tensor([1, 0, 0, 0]).unsqueeze(0).repeat(n, 1)
 
-        self.conv_trans = nn.Conv1d(128, 3, kernel_size=1)
+        self.conv_trans = nn.Conv1d(128, n * 3, kernel_size=1)
         nn.init.zeros_(self.conv_trans.bias)
 
         self.conv_ext =   nn.Sequential(nn.Conv1d(128, 32, kernel_size=1, bias=True),
                                         nn.LeakyReLU(negative_slope=0.2, inplace = True),
-                                        nn.Conv1d(32, 1, kernel_size=1, bias=True))
+                                        nn.Conv1d(32, n, kernel_size=1, bias=True))
 
     def forward(self, x_cuboid):
         scale = self.conv_scale(x_cuboid).transpose(2, 1)    # (batch_size, num_cuboid, 3)
@@ -170,6 +178,12 @@ class Para_pred(nn.Module):
         trans = torch.tanh(trans)                            # (batch_size, num_cuboid, 3)
 
         exist = self.conv_ext(x_cuboid).transpose(2, 1)
+
+        if self.separate_primitive_encoding:
+            scale = scale.reshape(x_cuboid.size(0), -1, 3)
+            rotate = rotate.reshape(x_cuboid.size(0), -1, 4)
+            trans = trans.reshape(x_cuboid.size(0), -1, 3)
+            exist = exist.reshape(x_cuboid.size(0), -1, 1)
 
         return scale, rotate, trans, exist
 
@@ -200,6 +214,7 @@ class Network_Whole(nn.Module):
         self.z_dims = hypara['N']['N_dim_z']
         self.attention_dim = hypara['N']['N_dim_att']
         self.nonvariational = hypara['N']['N_nonvariational_network']
+        self.separate_primitive_encoding = hypara['N']['N_separate_primitive_encoding']
         self.has_attention = has_attention
 
         self.cube_vert = torch.FloatTensor([[-1,-1,-1],[-1,-1,1],[-1,1,-1],[-1,1,1],[1,-1,-1],[1,-1,1],[1,1,-1],[1,1,1]]).cuda().detach()
@@ -213,9 +228,10 @@ class Network_Whole(nn.Module):
             num_cuboid = self.num_cuboid,
             low_dim_idx = self.low_dim_idx,
             nonvariational = self.nonvariational
+            separate_primitive_encoding = self.separate_primitive_encoding
         )
 
-        self.Para_pred = Para_pred()
+        self.Para_pred = Para_pred(self.separate_primitive_encoding, self.num_cuboid)
 
         if self.has_attention:
             self.Attention_module = Attention_module(attention_dim = self.attention_dim)
