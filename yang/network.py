@@ -44,18 +44,12 @@ class Feature_extract(nn.Module):
             self.fc_mu  = nn.Linear(self.emb_dims, self.z_dims)
             self.fc_var = nn.Linear(self.emb_dims, self.z_dims)
 
-        if self.separate_primitive_encoding:
-            self.conv_cuboid = nn.Sequential(nn.Conv1d(self.z_dims, 256, kernel_size=1, bias=False),
-                                             nn.LeakyReLU(negative_slope=0.2, inplace = True),
-                                             nn.Conv1d(256, 128, kernel_size=1, bias=False),
-                                             nn.LeakyReLU(negative_slope=0.2, inplace = True))
-        else:
-            self.enc_cuboid_vec = nn.Sequential(nn.Conv1d(self.num_cuboid, 64, kernel_size=1, bias=False),
-                                                nn.LeakyReLU(negative_slope=0.2, inplace = True))
-            self.conv_cuboid = nn.Sequential(nn.Conv1d(self.z_dims + 64, 256, kernel_size=1, bias=False),
-                                             nn.LeakyReLU(negative_slope=0.2, inplace = True),
-                                             nn.Conv1d(256, 128, kernel_size=1, bias=False),
-                                             nn.LeakyReLU(negative_slope=0.2, inplace = True))
+        self.enc_cuboid_vec = nn.Sequential(nn.Conv1d(self.num_cuboid, 64, kernel_size=1, bias=False),
+                                            nn.LeakyReLU(negative_slope=0.2, inplace = True))
+        self.conv_cuboid = nn.Sequential(nn.Conv1d(self.z_dims + 64, 256, kernel_size=1, bias=False),
+                                            nn.LeakyReLU(negative_slope=0.2, inplace = True),
+                                            nn.Conv1d(256, 128, kernel_size=1, bias=False),
+                                            nn.LeakyReLU(negative_slope=0.2, inplace = True))
 
     def knn(self, x, k):
         inner = -2*torch.matmul(x.transpose(2, 1), x)
@@ -140,14 +134,11 @@ class Feature_extract(nn.Module):
 
             z = self.reparameterize(mu, log_var).unsqueeze(-1)
 
-        if self.separate_primitive_encoding:
-            x_cuboid = self.conv_cuboid(z)
-        else:
-            cuboid_vec = self.cuboid_vector.unsqueeze(0).repeat(batch_size,1,1)           # (batch_size, num_cuboid, num_cuboid)
-            cuboid_vec = self.enc_cuboid_vec(cuboid_vec)                                  # (batch_size, 64, num_cuboid)
+        cuboid_vec = self.cuboid_vector.unsqueeze(0).repeat(batch_size,1,1)           # (batch_size, num_cuboid, num_cuboid)
+        cuboid_vec = self.enc_cuboid_vec(cuboid_vec)                                  # (batch_size, 64, num_cuboid)
 
-            x_cuboid = torch.cat((z.repeat(1,1,self.num_cuboid),cuboid_vec),dim=1)        # (batch_size, emb_dims + 64, num_cuboid)
-            x_cuboid = self.conv_cuboid(x_cuboid)                                         # (batch_size, 128, num_points)  
+        x_cuboid = torch.cat((z.repeat(1,1,self.num_cuboid),cuboid_vec),dim=1)        # (batch_size, emb_dims + 64, num_cuboid)
+        x_cuboid = self.conv_cuboid(x_cuboid)                                         # (batch_size, 128, num_cuboid)
 
         return x_per, x_cuboid, z, mu, log_var
 
@@ -156,39 +147,44 @@ class Para_pred(nn.Module):
     def __init__(self, separate_primitive_encoding, num_cuboid):
         super(Para_pred, self).__init__()
 
+        # Depthwise convolution v primeru separate_primitive_encoding = True
         self.separate_primitive_encoding = separate_primitive_encoding
-        n = num_cuboid if self.separate_primitive_encoding else 1
+        in_channels = num_cuboid if separate_primitive_encoding else 128
+        kernel_size = 128 if separate_primitive_encoding else 1
+        n_groups = num_cuboid if separate_primitive_encoding else 1
 
-        self.conv_scale = nn.Conv1d(128, n * 3, kernel_size=1)
+        self.conv_scale = nn.Conv1d(in_channels, n_groups * 3, kernel_size, groups = n_groups)
         nn.init.zeros_(self.conv_scale.bias)
 
-        self.conv_rotate = nn.Conv1d(128, n * 4, kernel_size=1)
-        self.conv_rotate.bias.data = torch.Tensor([1, 0, 0, 0]).repeat(n)
+        self.conv_rotate = nn.Conv1d(in_channels, n_groups * 4, kernel_size, groups = n_groups)
+        self.conv_rotate.bias.data = torch.Tensor([1, 0, 0, 0]).repeat(n_groups)
 
-        self.conv_trans = nn.Conv1d(128, n * 3, kernel_size=1)
+        self.conv_trans = nn.Conv1d(in_channels, n_groups * 3, kernel_size, groups = n_groups)
         nn.init.zeros_(self.conv_trans.bias)
 
-        self.conv_ext = nn.Sequential(nn.Conv1d(128, 32, kernel_size=1, bias=True),
+        self.conv_ext = nn.Sequential(nn.Conv1d(in_channels, n_groups * 32, kernel_size, groups = n_groups, bias=True),
                                       nn.LeakyReLU(negative_slope=0.2, inplace = True),
-                                      nn.Conv1d(32, n, kernel_size=1, bias=True))
+                                      nn.Conv1d(num_cuboid if separate_primitive_encoding else 32, n_groups, 32 if separate_primitive_encoding else 1, groups = n_groups, bias=True))
 
     def forward(self, x_cuboid):
-        scale = self.conv_scale(x_cuboid).transpose(2, 1)    # (batch_size, num_cuboid, 3)
-        scale = torch.sigmoid(scale)                         # (batch_size, num_cuboid, 3)
-        
-        rotate = self.conv_rotate(x_cuboid).transpose(2, 1)  # (batch_size, num_cuboid, 4)
-        # rotate = quat2mat(F.normalize(rotate,dim=2,p=2))     # (batch_size, num_cuboid, 3, 3)
-
-        trans = self.conv_trans(x_cuboid).transpose(2, 1)    # (batch_size, num_cuboid, 3)
-        trans = torch.tanh(trans)                            # (batch_size, num_cuboid, 3)
-
-        exist = self.conv_ext(x_cuboid).transpose(2, 1)
-
         if self.separate_primitive_encoding:
-            scale = scale.reshape(x_cuboid.size(0), -1, 3)
-            rotate = rotate.reshape(x_cuboid.size(0), -1, 4)
-            trans = trans.reshape(x_cuboid.size(0), -1, 3)
-            exist = exist.reshape(x_cuboid.size(0), -1, 1)
+            x_cuboid = x_cuboid.transpose(2, 1)
+
+        scale = self.conv_scale(x_cuboid)
+        scale = torch.sigmoid(scale)
+
+        rotate = self.conv_rotate(x_cuboid)
+
+        trans = self.conv_trans(x_cuboid)
+        trans = torch.tanh(trans)
+
+        exist = self.conv_ext(x_cuboid)
+
+        if not self.separate_primitive_encoding:
+            scale = scale.transpose(2, 1)
+            rotate = rotate.transpose(2, 1)
+            trans = trans.transpose(2, 1)
+            exist = exist.transpose(2, 1)
 
         return scale, rotate, trans, exist
 
@@ -276,9 +272,6 @@ class Network_Whole(nn.Module):
         # scale B * N * 3
         x_per, x_cuboid, z, mu, log_var = self.Feature_extract(pc)
         scale, rotate_quat, trans, exist = self.Para_pred(x_cuboid)
-
-        if self.separate_primitive_encoding:
-            x_cuboid = x_cuboid.repeat(1, 1, self.num_cuboid)
 
         rotate = quat2mat(F.normalize(rotate_quat,dim=2,p=2))
         rotate_quat = F.normalize(rotate_quat, dim = -1)
