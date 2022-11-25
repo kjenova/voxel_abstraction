@@ -149,26 +149,25 @@ class Para_pred(nn.Module):
 
         # Depthwise convolution v primeru separate_primitive_encoding = True
         self.separate_primitive_encoding = separate_primitive_encoding
-        in_channels = num_cuboid if separate_primitive_encoding else 128
-        kernel_size = 128 if separate_primitive_encoding else 1
+        kernel_size = 1
         n_groups = num_cuboid if separate_primitive_encoding else 1
 
-        self.conv_scale = nn.Conv1d(in_channels, n_groups * 3, kernel_size, groups = n_groups)
+        self.conv_scale = nn.Conv1d(n_groups * 128, n_groups * 3, kernel_size, groups = n_groups)
         nn.init.zeros_(self.conv_scale.bias)
 
-        self.conv_rotate = nn.Conv1d(in_channels, n_groups * 4, kernel_size, groups = n_groups)
+        self.conv_rotate = nn.Conv1d(n_groups * 128, n_groups * 4, kernel_size, groups = n_groups)
         self.conv_rotate.bias.data = torch.Tensor([1, 0, 0, 0]).repeat(n_groups)
 
-        self.conv_trans = nn.Conv1d(in_channels, n_groups * 3, kernel_size, groups = n_groups)
+        self.conv_trans = nn.Conv1d(n_groups * 128, n_groups * 3, kernel_size, groups = n_groups)
         nn.init.zeros_(self.conv_trans.bias)
 
-        self.conv_ext = nn.Sequential(nn.Conv1d(in_channels, n_groups * 32, kernel_size, groups = n_groups, bias=True),
+        self.conv_ext = nn.Sequential(nn.Conv1d(n_groups * 128, n_groups * 32, kernel_size, groups = n_groups, bias=True),
                                       nn.LeakyReLU(negative_slope=0.2, inplace = True),
-                                      nn.Conv1d(num_cuboid if separate_primitive_encoding else 32, n_groups, 32 if separate_primitive_encoding else 1, groups = n_groups, bias=True))
+                                      nn.Conv1d(n_groups * 32, n_groups, kernel_size, groups = n_groups, bias=True))
 
     def forward(self, x_cuboid):
         if self.separate_primitive_encoding:
-            x_cuboid = x_cuboid.transpose(2, 1)
+            x_cuboid = x_cuboid.transpose(2, 1).reshape(x_cuboid.size(0), -1, 1)
 
         scale = self.conv_scale(x_cuboid)
         scale = torch.sigmoid(scale)
@@ -180,7 +179,12 @@ class Para_pred(nn.Module):
 
         exist = self.conv_ext(x_cuboid)
 
-        if not self.separate_primitive_encoding:
+        if self.separate_primitive_encoding:
+            scale = scale.reshape(x_cuboid.size(0), -1, 3)
+            rotate = rotate.reshape(x_cuboid.size(0), -1, 4)
+            trans = trans.reshape(x_cuboid.size(0), -1, 3)
+            exist = exist.reshape(x_cuboid.size(0), -1, 1)
+        else:
             scale = scale.transpose(2, 1)
             rotate = rotate.transpose(2, 1)
             trans = trans.transpose(2, 1)
