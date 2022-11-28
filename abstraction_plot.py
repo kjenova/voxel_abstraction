@@ -45,13 +45,20 @@ _, test = load_urocell_preprocessed(params.urocell_dir)
 p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 
 volume_meshes = [pv.wrap(Trimesh(test[i].vertices, test[i].faces - 1)) for i in range(10)]
+test_set_plot = Image.new('RGB', (plot_image_width, plot_image_height), (0, 0, 0)) # Brez primitivov
 best_angles = []
-for volume_mesh in volume_meshes:
+for i, volume_mesh in enumerate(volume_meshes):
     volume_actor = p.add_mesh(volume_mesh)
-    _, best_angle = bruteforce_view(p, n_angles)
+    image, best_angle = bruteforce_view(p, n_angles)
     p.remove_actor(volume_actor)
 
     best_angles.append(best_angle)
+
+    k = i % 5
+    j = i // 5
+    test_set_plot.paste(image, box = (k * shape_image_size, j * shape_image_size))
+
+test_set_plot.save('results/test_set_plot.png')
 
 def plot_predictions(X, method):
     plot = Image.new('RGB', (plot_image_width, plot_image_height), (0, 0, 0))
