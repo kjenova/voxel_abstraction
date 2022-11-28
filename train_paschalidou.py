@@ -256,6 +256,7 @@ def main(argv):
     pcl_to_prim_losses = []
     prim_to_pcl_losses = []
     losses = []
+    min_val_loss = float('inf')
     for i in range(args.epochs):
         bar = get_logger(
             "euclidean_dual_loss",
@@ -334,13 +335,34 @@ def main(argv):
         # Finish the progress bar and save the model after every epoch
         bar.finish()
 
-        torch.save(
-            model.state_dict(),
-            os.path.join(
-                experiment_directory,
-                "model_%d" % (i + args.continue_from_epoch,)
+        val_loss_sum = .0
+        val_set_size = 0
+        for batch in validation_batches.get_all_batches(shuffle = False):
+            X, y_target = batch[:2]
+            X = X.unsqueeze(1)
+
+            y_hat = model(X)
+            loss, _ = euclidean_dual_loss(
+                y_hat,
+                y_target,
+                get_regularizer_terms(args, i),
+                sampler,
+                get_loss_options(args)
             )
-        )
+
+            val_loss_sum += loss.item() * X.size(0)
+            val_set_size += X.size(0)
+
+        val_loss = val_loss_sum / val_set_size
+        print(val_loss)
+        if val_loss < min_val_loss:
+            torch.save(
+                model.state_dict(),
+                os.path.join(
+                    experiment_directory,
+                    "model_%d" % (i + args.continue_from_epoch,)
+                )
+            )
 
     print [
         sum(losses[args.steps_per_epoch:]) / float(args.steps_per_epoch),
