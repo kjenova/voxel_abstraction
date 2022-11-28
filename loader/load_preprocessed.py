@@ -15,6 +15,6 @@ class PreprocessedShape:
 
 def load_preprocessed(directory, max_n_shapes = 1000000):
     shapes = []
-    filenames = glob.glob(f'{directory}/*.mat')[:max_n_shapes]
+    filenames = glob.glob(directory + '/*.mat')[:max_n_shapes]
     filenames.sort(key = lambda x: int(path.basename(x)[:-4]))
     return [PreprocessedShape(loadmat(f)) for f in filenames]

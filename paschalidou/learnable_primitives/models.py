@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import models
+# from torchvision import models
 
 
 class NetworkParameters(object):
@@ -60,7 +60,7 @@ class NetworkParameters(object):
         networks = dict(
             tulsiani=TulsianiNetwork,
             octnet=OctnetNetwork,
-            resnet18=ResNet18
+            # resnet18=ResNet18
         )
 
         return networks[self.architecture.lower()]
@@ -173,27 +173,28 @@ class OctnetNetwork(nn.Module):
         return self.primitive_layer(X.view(-1, 1024, 1, 1, 1))
 
 
-class ResNet18(nn.Module):
-    def __init__(self, network_params):
-        super(ResNet18, self).__init__()
-        self._network_params = network_params
+if False:
+    class ResNet18(nn.Module):
+        def __init__(self, network_params):
+            super(ResNet18, self).__init__()
+            self._network_params = network_params
 
-        self._features_extractor = models.resnet18(pretrained=True)
-        self._features_extractor.fc = nn.Sequential(
-            nn.Linear(512, 512), nn.ReLU(),
-            nn.Linear(512, 512), nn.ReLU()
-        )
-        self._features_extractor.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+            self._features_extractor = models.resnet18(pretrained=True)
+            self._features_extractor.fc = nn.Sequential(
+                nn.Linear(512, 512), nn.ReLU(),
+                nn.Linear(512, 512), nn.ReLU()
+            )
+            self._features_extractor.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
-        self._primitive_layer = self._network_params.primitive_layer(
-            self._network_params.n_primitives,
-            512
-        )
+            self._primitive_layer = self._network_params.primitive_layer(
+                self._network_params.n_primitives,
+                512
+            )
 
-    def forward(self, X):
-        X = X.float() / 255.0
-        x = self._features_extractor(X)
-        return self._primitive_layer(x.view(-1, 512, 1, 1, 1))
+        def forward(self, X):
+            X = X.float() / 255.0
+            x = self._features_extractor(X)
+            return self._primitive_layer(x.view(-1, 512, 1, 1, 1))
 
 
 class Translation(nn.Module):

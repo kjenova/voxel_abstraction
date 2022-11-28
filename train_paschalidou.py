@@ -96,21 +96,16 @@ def main(argv):
         description="Train a network to predict primitives"
     )
     parser.add_argument(
-        "train_dir",
+        "--train_dir",
         default="data/chamferData/01",
         help="Path to the directory containing the dataset"
     )
     parser.add_argument(
-        "train_dir",
-        default="data/chamferData/01",
-        help="Path to the directory containing the dataset"
-    )
-    parser.add_argument(
-        "urocell_dir",
+        "--urocell_dir",
         default="data/chamferData/urocell"
     )
     parser.add_argument(
-        "save_dir",
+        "--output_directory",
         default="results/paschalidou",
         help="Save the output files in that directory"
     )
@@ -130,7 +125,7 @@ def main(argv):
     parser.add_argument(
         "--n_primitives",
         type=int,
-        default=32,
+        default=16, # 32, # Za 32 je premalo VRAM-a.
         help="Number of primitives"
     )
     parser.add_argument(
@@ -270,6 +265,7 @@ def main(argv):
         )
         for b in range(args.steps_per_epoch):
             X, y_target = train_batches.get()[:2]
+            X = X.unsqueeze(1)
 
             # Train on batch
             batch_loss, metrics, debug_stats = train_on_batch(

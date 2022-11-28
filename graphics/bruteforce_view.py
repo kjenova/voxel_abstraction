@@ -17,20 +17,16 @@ def up_vector_on_sphere(v):
     up[i] = (v[j] + v[k]) / - v[i]
     return up / np.linalg.norm(up)
 
-max_shape_radius = np.sqrt(3) / 2 + 1e-4
-
 def rotate_scene(p, elevation, azimuth, transparent = False, camera_radius = 3.):
     p.store_image = True
-
-    clipping_range = (camera_radius - max_shape_radius, camera_radius + 2 * max_shape_radius)
 
     position = camera_radius * to_cartesian(elevation, azimuth)
     up = up_vector_on_sphere(position)
 
     p.set_position(position, reset = False)
-    p.set_focus(- position)
+    p.set_focus(.5 * position)
     p.set_viewup(up, reset = False)
-    p.camera.clipping_range = clipping_range
+    p.camera.clipping_range = (0.001, 100.0)
 
     image = p.screenshot(transparent_background = transparent)
     image = Image.fromarray(image, 'RGBA' if transparent else 'RGB')

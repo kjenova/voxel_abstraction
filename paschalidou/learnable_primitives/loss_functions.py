@@ -431,7 +431,7 @@ def prim_to_pcl_loss(
     # object for every point S
     # min_D = D.min(-1)[0] # min_D has size BxMxS
     if not use_chamfer:
-        outside = (1-inside).permute(0, 2, 1).unsqueeze(2).float()
+        outside = (~inside).permute(0, 2, 1).unsqueeze(2).float()
         assert outside.shape == (B, M, 1, N)
         D = D + (outside*1e30)
     # Compute the minimum distances D, with size BxMxS

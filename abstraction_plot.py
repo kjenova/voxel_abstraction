@@ -60,8 +60,8 @@ for i, volume_mesh in enumerate(volume_meshes):
 
 test_set_plot.save('results/test_set_plot.png')
 
-def plot_predictions(X, method):
-    plot = Image.new('RGB', (plot_image_width, plot_image_height), (0, 0, 0))
+def plot_predictions(X, method, transparent = False):
+    plot = Image.new('RGBA' if transparent else 'RGB', (plot_image_width, plot_image_height), (0, 0, 0))
 
     predictions_vertices = predictions_to_mesh_vertices(X).cpu()
     for i, volume_mesh in enumerate(volume_meshes):
@@ -73,7 +73,7 @@ def plot_predictions(X, method):
 
         k = i % 5
         j = i // 5
-        image = rotate_scene(p, *best_angles[i])
+        image = rotate_scene(p, *best_angles[i], transparent = transparent)
         plot.paste(image, box = (k * shape_image_size, j * shape_image_size))
 
         p.remove_actor(volume_actor)
