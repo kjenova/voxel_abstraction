@@ -356,6 +356,8 @@ def main(argv):
         val_loss = val_loss_sum / val_set_size
         print(val_loss)
         if val_loss < min_val_loss:
+            min_val_loss = val_loss
+
             torch.save(
                 model.state_dict(),
                 os.path.join(
