@@ -172,10 +172,18 @@ def main(argv):
         os.makedirs(args.output_directory)
 
     # Create an experiment directory using the experiment_tag
-    if args.experiment_tag is None:
-        experiment_tag = id_generator(9)
+    if False:
+        if args.experiment_tag is None:
+            experiment_tag = id_generator(9)
+        else:
+            experiment_tag = args.experiment_tag
     else:
-        experiment_tag = args.experiment_tag
+        max_experiment = 0
+        for name in os.listdir(args.output_directory):
+            if os.path.isdir(os.path.join(args.output_dir, name)) and name.isdigit():
+                max_experiment = max(int(name), max_experiment)
+
+        experiment = str(max_experiment + 1)
 
     experiment_directory = os.path.join(
         args.output_directory,
@@ -362,7 +370,7 @@ def main(argv):
                 model.state_dict(),
                 os.path.join(
                     experiment_directory,
-                    "model_%d" % (i + args.continue_from_epoch,)
+                    "model" # _%d" % (i + args.continue_from_epoch,)
                 )
             )
 
