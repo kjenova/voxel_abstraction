@@ -370,7 +370,7 @@ def main(argv):
                 model.state_dict(),
                 os.path.join(
                     experiment_directory,
-                    "model" # _%d" % (i + args.continue_from_epoch,)
+                    "model.torch" # _%d" % (i + args.continue_from_epoch,)
                 )
             )
 
