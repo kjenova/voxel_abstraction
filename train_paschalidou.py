@@ -183,7 +183,7 @@ def main(argv):
             if os.path.isdir(os.path.join(args.output_dir, name)) and name.isdigit():
                 max_experiment = max(int(name), max_experiment)
 
-        experiment = str(max_experiment + 1)
+        experiment_tag = str(max_experiment + 1)
 
     experiment_directory = os.path.join(
         args.output_directory,
