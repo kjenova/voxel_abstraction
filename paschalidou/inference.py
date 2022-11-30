@@ -16,6 +16,8 @@ from paschalidou.learnable_primitives.loss_functions import euclidean_dual_loss
 from paschalidou.learnable_primitives.primitives import\
     euler_angles_to_rotation_matrices, quaternions_to_rotation_matrices
 
+from paschalidou.scripts.visualization_utils import points_on_sq_surface, points_on_cuboid
+
 from common.batch_provider import BatchProvider, BatchProviderParams
 
 def get_shape_configuration(use_cuboids):
@@ -38,6 +40,12 @@ def inference(dataset):
 
     parser = argparse.ArgumentParser(
         description="Do the forward pass and estimate a set of primitives"
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=16,
+        help="Number of samples in a batch (default=32)"
     )
     parser.add_argument(
         "--n_primitives",
@@ -63,7 +71,7 @@ def inference(dataset):
     add_gaussian_noise_layer_parameters(parser)
     add_loss_parameters(parser)
     add_loss_options_parameters(parser)
-    args = parser.parse_args(argv)
+    args = parser.parse_args(sys.argv[1:])
 
     # A sampler instance
     e = EqualDistanceSamplerSQ(200)
@@ -73,11 +81,11 @@ def inference(dataset):
     batch_params = BatchProviderParams(
         device,
         n_samples_per_shape = args.n_points_from_mesh,
-        batch_size = args.batch_size
+        batch_size = 1 # args.batch_size
     )
 
     test_batches = BatchProvider(
-        dataset
+        dataset,
         batch_params,
         store_on_gpu = True,
         uses_point_sampling = True
@@ -96,7 +104,7 @@ def inference(dataset):
     results = []
     for volume, _, _ in test_batches.get_all_batches():
         # Do the forward pass and estimate the primitive parameters
-        y_hat = model(volume)
+        y_hat = model(volume.unsqueeze(1))
 
         M = args.n_primitives  # number of primitives
         probs = y_hat[0].to("cpu").detach().numpy()
@@ -122,14 +130,10 @@ def inference(dataset):
             args.n_primitives, 2
         ).detach().numpy()
 
-        pts = y_target[:, :, :3].to("cpu")
-        pts_labels = y_target[:, :, -1].to("cpu").squeeze().numpy()
-        pts = pts.squeeze().detach().numpy().T
-
         primitives = []
         for i in range(args.n_primitives):
-            if probs[0, 1] >= args.prob_threshold:
-                _, _, _, transformed_pts = get_shape_configuration(args.use_cuboids)(
+            if True: # probs[0, 1] >= args.prob_threshold:
+                _, _, _, points = get_shape_configuration(args.use_cuboids)(
                     shapes[i, 0],
                     shapes[i, 1],
                     shapes[i, 2],
@@ -141,6 +145,8 @@ def inference(dataset):
                     taperings[i, 1]
                 )
 
-                primitives.append(transformed_pts)
+                primitives.append(points.transpose())
+
+        results.append(np.vstack(primitives))
 
     return results

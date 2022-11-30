@@ -7,7 +7,6 @@ import pyvista as pv
 from tulsiani.inference import inference as tulsiani_inference
 from yang.inference import inference as yang_inference
 
-from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
 
 from common.transform import predictions_to_mesh_vertices
