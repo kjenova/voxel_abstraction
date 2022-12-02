@@ -180,7 +180,7 @@ def main(argv):
     else:
         max_experiment = 0
         for name in os.listdir(args.output_directory):
-            if os.path.isdir(os.path.join(args.output_dir, name)) and name.isdigit():
+            if os.path.isdir(os.path.join(args.output_directory, name)) and name.isdigit():
                 max_experiment = max(int(name), max_experiment)
 
         experiment_tag = str(max_experiment + 1)
