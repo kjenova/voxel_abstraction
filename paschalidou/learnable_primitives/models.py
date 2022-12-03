@@ -105,7 +105,7 @@ class TulsianiNetwork(nn.Module):
         n_encoder_layers = np.around(np.log2(network_params.grid_shape[0])).astype(int)
         for i in range(n_encoder_layers):
             encoder_layers.append(
-                nn.Conv3d(input_channels, n_filters, kernel_size=3, padding=1)
+                nn.Conv3d(input_channels, n_filters, kernel_size=3, padding=1, bias=False)
             )
             encoder_layers.append(nn.BatchNorm3d(n_filters))
             encoder_layers.append(nn.LeakyReLU(0.2, True))
@@ -119,8 +119,8 @@ class TulsianiNetwork(nn.Module):
         input_channels = n_filters / 2
         n_filters = 100
         for i in range(2):
-            encoder_layers.append(nn.Conv3d(input_channels, n_filters, 1))
-            # encoder_layers.append(nn.BatchNorm3d(n_filters))
+            encoder_layers.append(nn.Conv3d(input_channels, n_filters, 1, bias=False))
+            encoder_layers.append(nn.BatchNorm3d(n_filters))
             encoder_layers.append(nn.LeakyReLU(0.2, True))
 
             input_channels = n_filters
