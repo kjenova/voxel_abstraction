@@ -19,7 +19,7 @@ for i, primitives in enumerate(X):
     pcd.points = o3d.utility.Vector3dVector(np.vstack(primitives))
     o3d.io.write_point_cloud("results/paschalidou/" + str(i + 1) + ".ply", pcd)
 
-n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
+n_angles = 8
 shape_image_size = 512
 plot_image_height = 2 * shape_image_size
 plot_image_width = 5 * shape_image_size
@@ -59,4 +59,5 @@ for i, volume_mesh in enumerate(volume_meshes):
     p.remove_actor(volume_actor)
     p.remove_actor(predictions_actor)
 
-plot.save(f'results/paschalidou/abstraction_paschalidou.png')
+plot.save('results/paschalidou/abstraction_paschalidou.png')
+

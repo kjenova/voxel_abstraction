@@ -11,7 +11,8 @@ class NetworkParameters(object):
                  mu=0.0, sigma=0.001, add_gaussian_noise=False,
                  use_sq=False, make_dense=False,
                  use_deformations=False,
-                 train_with_bernoulli=False):
+                 train_with_bernoulli=False,
+                 grid_shape=None):
         self.architecture = architecture
         self.n_primitives = n_primitives
         self.train_with_bernoulli = train_with_bernoulli
@@ -24,6 +25,7 @@ class NetworkParameters(object):
         self.use_sq = use_sq
         self.use_deformations = use_deformations
         self.make_dense = make_dense
+        self.grid_shape = grid_shape
 
     @classmethod
     def from_options(cls, argument_parser):
@@ -52,7 +54,8 @@ class NetworkParameters(object):
             use_sq=use_sq,
             use_deformations=use_deformations,
             train_with_bernoulli=train_with_bernoulli,
-            make_dense=make_dense
+            make_dense=make_dense,
+            grid_shape=args["grid_shape"]
         )
 
     @property
@@ -99,7 +102,8 @@ class TulsianiNetwork(nn.Module):
 
         encoder_layers = []
         # Create an encoder using a stack of convolutions
-        for i in range(5):
+        n_encoder_layers = np.around(np.log2(network_params.grid_shape[0])).astype(int)
+        for i in range(n_encoder_layers):
             encoder_layers.append(
                 nn.Conv3d(input_channels, n_filters, kernel_size=3, padding=1)
             )
