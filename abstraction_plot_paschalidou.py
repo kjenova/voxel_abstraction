@@ -6,6 +6,7 @@ import pyvista as pv
 
 from loader.load_urocell import load_urocell_preprocessed
 
+from graphics.bruteforce_view import rotate_scene, bruteforce_view
 from graphics.colors import colors
 
 with open("results/paschalidou/points.npy", "rb") as f:
@@ -40,18 +41,19 @@ for i, volume_mesh in enumerate(volume_meshes):
 
     best_angles.append(best_angle)
 
+transparent = False
 plot = Image.new('RGBA' if transparent else 'RGB', (plot_image_width, plot_image_height), (0, 0, 0))
 
 for i, volume_mesh in enumerate(volume_meshes):
     volume_actor = p.add_mesh(volume_mesh, opacity = .5)
 
     primitive_points = points[i][probability[i] > prob_threshold]
-    m, n = primitive_points.size()[:2]
+    [m, n, _] = primitive_points.shape
 
     if m > 0:
         c = colors[:m].reshape(m, 1, 3).repeat(n, axis = 1)
-        predictions_mesh = pv.PolyData(np.vstack(primitive_points))
-        predictions_mesh["colors"] = c
+        predictions_mesh = pv.PolyData(primitive_points.reshape(-1, 3))
+        predictions_mesh["colors"] = c.reshape(-1, 3)
 
         predictions_actor = p.add_mesh(predictions_mesh, scalars = "colors", rgb = True)
 
