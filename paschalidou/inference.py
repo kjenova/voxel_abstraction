@@ -147,6 +147,6 @@ def inference(dataset):
 
                 primitives.append(points.transpose())
 
-        results.append(np.vstack(primitives))
+        results.append(primitives) # np.vstack(primitives))
 
     return results
