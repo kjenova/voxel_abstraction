@@ -4,20 +4,24 @@ from trimesh import Trimesh
 from PIL import Image
 import pyvista as pv
 
-from paschalidou.inference import inference as paschalidou_inference
-
 from loader.load_urocell import load_urocell_preprocessed
 
 from graphics.colors import colors
 
+with open("results/paschalidou/points.npy", "rb") as f:
+    points = np.load(f)
+
+with open("results/paschalidou/probability.npy", "rb") as f:
+    probability = np.load(f)
+
+for i in range(10):
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points[i].reshape(-1, 3))
+    o3d.io.write_point_cloud("results/paschalidou/" + str(i + 1) + ".ply", pcd)
+
 _, test = load_urocell_preprocessed("data/chamferData/urocell")
 
-X = paschalidou_inference(test)
-
-for i, primitives in enumerate(X):
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(np.vstack(primitives))
-    o3d.io.write_point_cloud("results/paschalidou/" + str(i + 1) + ".ply", pcd)
+prob_threshold = .5
 
 n_angles = 8
 shape_image_size = 512
@@ -39,17 +43,18 @@ for i, volume_mesh in enumerate(volume_meshes):
 plot = Image.new('RGBA' if transparent else 'RGB', (plot_image_width, plot_image_height), (0, 0, 0))
 
 for i, volume_mesh in enumerate(volume_meshes):
-    p = len(X[i])
-    if p <= 0:
-        continue
-
-    n = X[i][0].shape[0]
-    c = colors[:p].reshape(p, 1, 3).repeat(n, axis = 1)
-    predictions_mesh = pv.PolyData(np.vstack(X[i]))
-    predictions_mesh["colors"] = c
-
     volume_actor = p.add_mesh(volume_mesh, opacity = .5)
-    predictions_actor = p.add_mesh(predictions_mesh, scalars = "colors", rgb = True)
+
+    primitive_points = points[i][probability[i] > prob_threshold]
+    m, n = primitive_points.size()[:2]
+
+    if m > 0:
+        c = colors[:m].reshape(m, 1, 3).repeat(n, axis = 1)
+        predictions_mesh = pv.PolyData(np.vstack(primitive_points))
+        predictions_mesh["colors"] = c
+
+        predictions_actor = p.add_mesh(predictions_mesh, scalars = "colors", rgb = True)
+
 
     k = i % 5
     j = i // 5
@@ -57,7 +62,9 @@ for i, volume_mesh in enumerate(volume_meshes):
     plot.paste(image, box = (k * shape_image_size, j * shape_image_size))
 
     p.remove_actor(volume_actor)
-    p.remove_actor(predictions_actor)
+
+    if m > 0:
+        p.remove_actor(predictions_actor)
 
 plot.save('results/paschalidou/abstraction_paschalidou.png')
 

@@ -101,7 +101,8 @@ def inference(dataset):
     )
     model.eval()
 
-    results = []
+    points = []
+    probability = []
     for volume, _, _ in test_batches.get_all_batches():
         # Do the forward pass and estimate the primitive parameters
         y_hat = model(volume.unsqueeze(1))
@@ -130,23 +131,32 @@ def inference(dataset):
             args.n_primitives, 2
         ).detach().numpy()
 
-        primitives = []
+        primitives_points = []
         for i in range(args.n_primitives):
-            if True: # probs[0, 1] >= args.prob_threshold:
-                _, _, _, points = get_shape_configuration(args.use_cuboids)(
-                    shapes[i, 0],
-                    shapes[i, 1],
-                    shapes[i, 2],
-                    epsilons[i, 0],
-                    epsilons[i, 1],
-                    R[i].numpy(),
-                    translations[i].reshape(-1, 1),
-                    taperings[i, 0],
-                    taperings[i, 1]
-                )
+            _, _, _, p = get_shape_configuration(args.use_cuboids)(
+                shapes[i, 0],
+                shapes[i, 1],
+                shapes[i, 2],
+                epsilons[i, 0],
+                epsilons[i, 1],
+                R[i].numpy(),
+                translations[i].reshape(-1, 1),
+                taperings[i, 0],
+                taperings[i, 1]
+            )
 
-                primitives.append(points.transpose())
+            primitives_points.append(p.transpose())
 
-        results.append(primitives) # np.vstack(primitives))
+        points.append(np.stack(primitives_points))
+        probability.append(probs[0, :])
+
+    points = np.stack(points)
+    probability = np.stack(probability)
+
+    with open("results/paschalidou/points.npy", "wb") as f:
+        np.save(f, points)
+
+    with open("results/paschalidou/probability.npy", "wb") as f:
+        np.save(f, probability)
 
     return results
