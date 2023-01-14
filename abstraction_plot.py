@@ -23,7 +23,7 @@ n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
 shape_image_size = 512
 plot_image_height = 2 * shape_image_size
 plot_image_width = 5 * shape_image_size
-plot_image_size = [plot_image_width, plot_image_height]
+plot_image_size = (plot_image_width, plot_image_height)
 
 def prediction_vertices_to_mesh(vertices):
     p = vertices.shape[0]
@@ -44,7 +44,7 @@ _, test = load_urocell_preprocessed(params.urocell_dir)
 p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 
 volume_meshes = [pv.wrap(Trimesh(test[i].vertices, test[i].faces - 1)) for i in range(10)]
-test_set_plot = Image.new('RGB', (plot_image_width, plot_image_height), (0, 0, 0)) # Brez primitivov
+test_set_plot = Image.new('RGB', plot_image_size, (0, 0, 0)) # Brez primitivov
 best_angles = []
 for i, volume_mesh in enumerate(volume_meshes):
     volume_actor = p.add_mesh(volume_mesh)
@@ -60,7 +60,7 @@ for i, volume_mesh in enumerate(volume_meshes):
 test_set_plot.save('results/test_set_plot.png')
 
 def plot_predictions(X, method, transparent = False):
-    plot = Image.new('RGBA' if transparent else 'RGB', (plot_image_width, plot_image_height), (0, 0, 0))
+    plot = Image.new('RGBA' if transparent else 'RGB', plot_image_size, (0, 0, 0))
 
     predictions_vertices = predictions_to_mesh_vertices(X).cpu()
     for i, volume_mesh in enumerate(volume_meshes):
