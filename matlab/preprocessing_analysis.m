@@ -1,6 +1,7 @@
 function preprocessing_analysis()
     erosion_analysis();
     resizing_analysis();
+    normals_analysis();
 end
 
 function [] = erosion_analysis()
@@ -8,7 +9,7 @@ function [] = erosion_analysis()
     globals;
     cachedir = cachedir;
 
-    erosionDir = fullfile(cachedir, 'shapenet', 'analysis', 'erosion');
+    erosionDir = fullfile(cachedir, 'analysis', 'erosion');
 
     maxKernelSize = 6;
 
@@ -17,23 +18,24 @@ function [] = erosion_analysis()
 
     for kernelSize = 1:maxKernelSize
         if kernelSize > 1
-            E = imerode(V, strel("cube", kernelSize))
+            E = imerode(V, strel("cube", kernelSize));
         else
-            E = V
+            E = V;
         end
 
         CC = bwconncomp(E);
         numPixels = cellfun(@numel, CC.PixelIdxList);
         [~, argmax] = max(numPixels);
 
-        X = zeros(size(V))
+        X = zeros(size(V));
         X(CC.PixelIdxList{argmax}) = 1;
         cropped = regionprops(X, "FilledImage").FilledImage;
         [FV, ~] = Voxel2mesh(cropped);
+        faces = FV.faces;
 
         maxSize = max(size(cropped));
         normalizedVertices = (FV.vertices - 0.5) / maxSize;
-        standardizedVertices = normalizedVertices - 0.5;
+        vertices = normalizedVertices - 0.5;
 
         erosionFile = fullfile(erosionDir, strcat(num2str(kernelSize), '.mat'));
         save(erosionFile, 'vertices', 'faces');
@@ -45,14 +47,14 @@ function [] = resizing_analysis()
     globals;
     cachedir = cachedir;
 
-    resizingDir = fullfile(cachedir, 'shapenet', 'analysis', 'resizing');
+    resizingDir = fullfile(cachedir, 'analysis', 'resizing');
 
     % Tole je zadnja oblika v testni množici. Je najbolj "kompleksna".
-    V = niftiread('fib1-4-3-0');
-    V = V == 1
+    V = niftiread('branched/fib1-4-3-0.nii.gz');
+    V = V == 1;
     CC = bwconncomp(V);
     numPixels = cellfun(@numel, CC.PixelIdxList);
-    [sorted, indices] = sort(numPixels, 'descend');
+    [~, argmax] = max(numPixels);
 
     X = zeros(size(V));
     X(CC.PixelIdxList{argmax}) = 1;
@@ -86,14 +88,16 @@ function [] = normals_analysis()
     globals;
     cachedir = cachedir;
 
-    normalsDir = fullfile(cachedir, 'shapenet', 'analysis', 'normals');
+    numSamples = 10000;
+
+    normalsDir = fullfile(cachedir, 'analysis', 'normals');
 
     % Tole je šesta oblika v testni množici. Je "preprosta".
-    V = niftiread('fib1-3-2-1.nii.gz');
+    V = niftiread('branched/fib1-3-2-1.nii.gz');
     V = V == 2;
     CC = bwconncomp(V);
     numPixels = cellfun(@numel, CC.PixelIdxList);
-    [sorted, indices] = sort(numPixels, 'descend');
+    [~, indices] = sort(numPixels, 'descend');
 
     X = zeros(size(V));
     X(CC.PixelIdxList{indices(19)}) = 1;
@@ -109,7 +113,7 @@ function [] = normals_analysis()
     points = surfaceSamples(:, 1:3);
     normals = surfaceSamples(:, 4:6);
 
-    normalsFile = fullfile(resizingDir, strcat(num2str(1), '.mat'));
+    normalsFile = fullfile(normalsDir, strcat(num2str(1), '.mat'));
     save(normalsFile, 'vertices', 'faces', 'points', 'normals');
 end
 

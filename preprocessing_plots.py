@@ -1,7 +1,7 @@
 import nibabel
 import numpy as np
 from scipy.io import loadmat
-from scipy.ndimage.morphology import binary_erosion
+from scipy.ndimage import binary_erosion
 from skimage import measure
 from trimesh import Trimesh
 from PIL import Image
@@ -16,41 +16,44 @@ n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
 p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 
 def erosion_plot():
-    plot_image_height = 2 * shape_image_size
-    plot_image_width = 3 * shape_image_size
-
-    plot = Image.new('RGBA', (plot_image_width, plot_image_height), (0, 0, 0))
+    plot = Image.new('RGB', (3 * shape_image_size, 2 * shape_image_size), (0, 0, 0))
 
     best_angles = None
 
     for i in range(1, 7):
         mat = loadmat(f'analysis/erosion/{i}.mat')
-        mesh = pv.wrap(Trimesh(mat['vertices'], mat['faces'] - 1)
+        mesh = pv.wrap(Trimesh(mat['vertices'], mat['faces'] - 1))
         volume_actor = p.add_mesh(mesh)
 
         if i == 1:
-            image, best_angles = bruteforce_view(p, n_angles, transparent = True)
+            image, best_angles = bruteforce_view(p, n_angles)
         else:
-            image = rotate_scene(p, *best_angles, transparent = True)
+            image = rotate_scene(p, *best_angles)
 
         p.remove_actor(volume_actor)
 
-        k = i % 3
-        j = i // 3
+        k = (i - 1) % 3
+        j = (i - 1) // 3
 
         plot.paste(image, box = (k * shape_image_size, j * shape_image_size))
 
     plot.save('analysis/erosion.png')
 
 def resizing_plot():
-    plot = Image.new('RGBA', (shape_image_size, 2 * shape_image_size), (0, 0, 0))
+    plot = Image.new('RGB', (2 * shape_image_size, shape_image_size), (0, 0, 0))
+
+    best_angles = None
 
     for i, grid_size in enumerate([32, 64]):
         mat = loadmat(f'analysis/resizing/{grid_size}.mat')
-        mesh = pv.wrap(Trimesh(mat['vertices'], mat['faces'] - 1)
+        mesh = pv.wrap(Trimesh(mat['vertices'], mat['faces'] - 1))
         volume_actor = p.add_mesh(mesh)
 
-        image, best_angles = bruteforce_view(p, n_angles, transparent = True)
+        if i == 0:
+            image, best_angles = bruteforce_view(p, n_angles)
+        else:
+            image = rotate_scene(p, *best_angles)
+
         plot.paste(image, box = (i * shape_image_size, 0))
 
         p.remove_actor(volume_actor)
@@ -59,13 +62,13 @@ def resizing_plot():
 
 def normals_plot():
     mat = loadmat('analysis/normals/1.mat')
-    mesh = pv.wrap(Trimesh(mat['vertices'], mat['faces'] - 1)
+    mesh = pv.wrap(Trimesh(mat['vertices'], mat['faces'] - 1))
 
     volume_actor = p.add_mesh(mesh)
     _, best_angles = bruteforce_view(p, n_angles)
-    arrows_actor = p.add_arrows(mat['points'], mat['normals'], mag = 0.01)
+    arrows_actor = p.add_arrows(mat['points'], mat['normals'], mag = 0.1, show_scalar_bar = False)
 
-    image = rotate_scene(p, *best_angles, transparent = True)
+    image = rotate_scene(p, *best_angles)
     image.save('analysis/normals.png')
 
     p.remove_actor(volume_actor)
@@ -73,3 +76,5 @@ def normals_plot():
 
 erosion_plot()
 resizing_plot()
+normals_plot()
+
