@@ -12,6 +12,7 @@ function [] = erosion_analysis()
     erosionDir = fullfile(cachedir, 'analysis', 'erosion');
 
     maxKernelSize = 6;
+    nTopComponents = 10;
 
     V = niftiread('mito-endolyso.nii');
     V = V == 1;
@@ -25,20 +26,22 @@ function [] = erosion_analysis()
 
         CC = bwconncomp(E);
         numPixels = cellfun(@numel, CC.PixelIdxList);
-        [~, argmax] = max(numPixels);
+        [~, indices] = sort(numPixels, 'descend');
 
-        X = zeros(size(V));
-        X(CC.PixelIdxList{argmax}) = 1;
-        cropped = regionprops(X, "FilledImage").FilledImage;
-        [FV, ~] = Voxel2mesh(cropped);
-        faces = FV.faces;
+        for i = 1:nTopComponents
+            X = zeros(size(V));
+            X(CC.PixelIdxList{indices(i)}) = 1;
+            cropped = regionprops(X, "FilledImage").FilledImage;
+            [FV, ~] = Voxel2mesh(cropped);
+            faces = FV.faces;
 
-        maxSize = max(size(cropped));
-        normalizedVertices = (FV.vertices - 0.5) / maxSize;
-        vertices = normalizedVertices - 0.5;
+            maxSize = max(size(cropped));
+            normalizedVertices = (FV.vertices - 0.5) / maxSize;
+            vertices = normalizedVertices - 0.5;
 
-        erosionFile = fullfile(erosionDir, strcat(num2str(kernelSize), '.mat'));
-        save(erosionFile, 'vertices', 'faces');
+            erosionFile = fullfile(erosionDir, strcat(num2str(i), '_', num2str(kernelSize), '.mat'));
+            save(erosionFile, 'vertices', 'faces');
+        end
     end
 end
 
@@ -64,19 +67,25 @@ function [] = resizing_analysis()
     resizing_analysis_helper(cropped, 64, resizingDir);
 end
 
-function [faces, vertices] = resizing_analysis_helper(cropped, gridSize, resizingDir)
-    maxSize = max(size(cropped));
-    Volume = imresize3(cropped, gridSize / maxSize);
+function Volume = resize_volume(Volume, gridSize)
+    maxSize = max(size(Volume));
+    Volume = imresize3(Volume, gridSize / maxSize);
     padding = gridSize - size(Volume);
-    Volume = padarray(Volume, padding, 0, 'post');
+    padding_pre = floor(padding / 2)
+    Volume = padarray(Volume, padding_pre, 0, 'pre');
+    Volume = padarray(Volume, padding - padding_pre, 0, 'post');
     if ~isequal(size(Volume), [gridSize gridSize gridSize])
         disp("!!!!!!!!");
     end
+end
+
+function [faces, vertices] = resizing_analysis_helper(cropped, gridSize, resizingDir)
+    Volume = resize_volume(volume, gridSize);
 
     [FV, ~] = Voxel2mesh(Volume);
     faces = FV.faces;
 
-    normalizedVertices = (FV.vertices - 0.5) / gridSize;
+    normalizedVertices = (FV.vertices - 0.5) / max(size(cropped));
     vertices = normalizedVertices - 0.5;
 
     resizingFile = fullfile(resizingDir, strcat(num2str(gridSize), '.mat'));
@@ -88,7 +97,7 @@ function [] = normals_analysis()
     globals;
     cachedir = cachedir;
 
-    numSamples = 10000;
+    numSamples = 100;
 
     normalsDir = fullfile(cachedir, 'analysis', 'normals');
 

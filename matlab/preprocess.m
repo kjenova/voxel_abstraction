@@ -31,14 +31,7 @@ function [] = preprocess()
 
         surfaceSamples = sampling(FV.faces, standardizedVertices, numSamples);
 
-        maxSize = max(size(cropped));
-        Volume = imresize3(cropped, gridSize / maxSize);
-        padding = gridSize - size(Volume);
-        Volume = padarray(Volume, padding, 0, 'post');
-        if ~isequal(size(Volume), [gridSize gridSize gridSize])
-            disp("!!!!!!!!");
-            disp(i);
-        end
+        Volume = resize_volume(cropped, gridSize);
 
         stepRange = -0.5 + 1 / (2 * gridSize) :1 / gridSize : 0.5 - 1 / (2 * gridSize);
         [Xp,Yp,Zp] = ndgrid(stepRange, stepRange, stepRange);
@@ -58,9 +51,22 @@ function [] = preprocess()
     pBar.stop();
 end
 
+function Volume = resize_volume(Volume, gridSize)
+    maxSize = max(size(Volume));
+    Volume = imresize3(Volume, gridSize / maxSize);
+    padding = gridSize - size(Volume);
+    padding_pre = floor(padding / 2)
+    Volume = padarray(Volume, padding_pre, 0, 'pre');
+    Volume = padarray(Volume, padding - padding_pre, 0, 'post');
+    if ~isequal(size(Volume), [gridSize gridSize gridSize])
+        disp("!!!!!!!!");
+    end
+end
+
 function savefunc(tsdfFile, tsdf, Volume, closestPoints, surfaceSamples, vertices, faces, normals)
     save(tsdfFile, 'tsdf', 'Volume', 'closestPoints', 'surfaceSamples', 'vertices', 'faces', 'normals');
 end
+
 function [finalSamples] = sampling(faces, vertices, numSamples)
     samples = basic_sampling(faces, vertices, numSamples);
 

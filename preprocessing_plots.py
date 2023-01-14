@@ -16,28 +16,28 @@ n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
 p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 
 def erosion_plot():
-    plot = Image.new('RGB', (3 * shape_image_size, 2 * shape_image_size), (0, 0, 0))
+    for j in range(1, 11):
+        plot = Image.new('RGB', (3 * shape_image_size, 2 * shape_image_size), (0, 0, 0))
+        best_angles = None
 
-    best_angles = None
+        for i in range(1, 7):
+            mat = loadmat(f'analysis/erosion/{j}_{i}.mat')
+            mesh = pv.wrap(Trimesh(mat['vertices'], mat['faces'] - 1))
+            volume_actor = p.add_mesh(mesh)
 
-    for i in range(1, 7):
-        mat = loadmat(f'analysis/erosion/{i}.mat')
-        mesh = pv.wrap(Trimesh(mat['vertices'], mat['faces'] - 1))
-        volume_actor = p.add_mesh(mesh)
+            if i == 1:
+                image, best_angles = bruteforce_view(p, n_angles)
+            else:
+                image = rotate_scene(p, *best_angles)
 
-        if i == 1:
-            image, best_angles = bruteforce_view(p, n_angles)
-        else:
-            image = rotate_scene(p, *best_angles)
+            p.remove_actor(volume_actor)
 
-        p.remove_actor(volume_actor)
+            k = (i - 1) % 3
+            j = (i - 1) // 3
 
-        k = (i - 1) % 3
-        j = (i - 1) // 3
+            plot.paste(image, box = (k * shape_image_size, j * shape_image_size))
 
-        plot.paste(image, box = (k * shape_image_size, j * shape_image_size))
-
-    plot.save('analysis/erosion.png')
+        plot.save(f'analysis/erosion_{j}.png')
 
 def resizing_plot():
     plot = Image.new('RGB', (2 * shape_image_size, shape_image_size), (0, 0, 0))
@@ -66,7 +66,7 @@ def normals_plot():
 
     volume_actor = p.add_mesh(mesh)
     _, best_angles = bruteforce_view(p, n_angles)
-    arrows_actor = p.add_arrows(mat['points'], mat['normals'], mag = 0.1, show_scalar_bar = False)
+    arrows_actor = p.add_arrows(mat['points'], mat['normals'], mag = 0.2, show_scalar_bar = False)
 
     image = rotate_scene(p, *best_angles)
     image.save('analysis/normals.png')
