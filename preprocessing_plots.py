@@ -16,12 +16,12 @@ n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
 p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 
 def erosion_plot():
-    for j in range(1, 11):
+    for u in range(1, 11):
         plot = Image.new('RGB', (3 * shape_image_size, 2 * shape_image_size), (0, 0, 0))
         best_angles = None
 
         for i in range(1, 7):
-            mat = loadmat(f'analysis/erosion/{j}_{i}.mat')
+            mat = loadmat(f'analysis/erosion/{u}_{i}.mat')
             mesh = pv.wrap(Trimesh(mat['vertices'], mat['faces'] - 1))
             volume_actor = p.add_mesh(mesh)
 
@@ -37,7 +37,7 @@ def erosion_plot():
 
             plot.paste(image, box = (k * shape_image_size, j * shape_image_size))
 
-        plot.save(f'analysis/erosion_{j}.png')
+        plot.save(f'analysis/erosion_{u}.png')
 
 def resizing_plot():
     plot = Image.new('RGB', (2 * shape_image_size, shape_image_size), (0, 0, 0))

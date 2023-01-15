@@ -26,7 +26,7 @@ function Volume = resize_volume(Volume, gridSize)
     maxSize = max(size(Volume));
     Volume = imresize3(Volume, gridSize / maxSize);
     padding = gridSize - size(Volume);
-    padding_pre = floor(padding / 2)
+    padding_pre = floor(padding / 2);
     Volume = padarray(Volume, padding_pre, 0, 'pre');
     Volume = padarray(Volume, padding - padding_pre, 0, 'post');
     if ~isequal(size(Volume), [gridSize gridSize gridSize])

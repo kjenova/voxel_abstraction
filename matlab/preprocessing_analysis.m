@@ -71,7 +71,7 @@ function Volume = resize_volume(Volume, gridSize)
     maxSize = max(size(Volume));
     Volume = imresize3(Volume, gridSize / maxSize);
     padding = gridSize - size(Volume);
-    padding_pre = floor(padding / 2)
+    padding_pre = floor(padding / 2);
     Volume = padarray(Volume, padding_pre, 0, 'pre');
     Volume = padarray(Volume, padding - padding_pre, 0, 'post');
     if ~isequal(size(Volume), [gridSize gridSize gridSize])
@@ -80,12 +80,12 @@ function Volume = resize_volume(Volume, gridSize)
 end
 
 function [faces, vertices] = resizing_analysis_helper(cropped, gridSize, resizingDir)
-    Volume = resize_volume(volume, gridSize);
+    Volume = resize_volume(cropped, gridSize);
 
     [FV, ~] = Voxel2mesh(Volume);
     faces = FV.faces;
 
-    normalizedVertices = (FV.vertices - 0.5) / max(size(cropped));
+    normalizedVertices = (FV.vertices - 0.5) / gridSize;
     vertices = normalizedVertices - 0.5;
 
     resizingFile = fullfile(resizingDir, strcat(num2str(gridSize), '.mat'));
