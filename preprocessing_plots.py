@@ -44,7 +44,7 @@ def resizing_plot():
 
     best_angles = None
 
-    for i, grid_size in enumerate(['original', 32, 64]):
+    for i, grid_size in enumerate(['original', 64, 32]):
         mat = loadmat(f'analysis/resizing/{grid_size}.mat')
         mesh = pv.wrap(Trimesh(mat['vertices'], mat['faces'] - 1))
         volume_actor = p.add_mesh(mesh)
