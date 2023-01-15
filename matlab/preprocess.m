@@ -12,7 +12,7 @@ function [] = preprocess()
 
     V = niftiread('mito-endolyso.nii');
     V = V == 1;
-    V = imerode(V, strel("cube", 6));
+    V = imerode(V, strel("sphere", 3));
     CC = bwconncomp(V);
     numPixels = cellfun(@numel, CC.PixelIdxList);
     [~, indices] = sort(numPixels, 'descend');

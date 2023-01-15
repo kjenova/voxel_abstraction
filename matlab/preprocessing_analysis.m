@@ -19,7 +19,7 @@ function [] = erosion_analysis()
 
     for kernelSize = 1:maxKernelSize
         if kernelSize > 1
-            E = imerode(V, strel("cube", kernelSize));
+            E = imerode(V, strel("sphere", kernelSize));
         else
             E = V;
         end
@@ -57,7 +57,7 @@ function [] = resizing_analysis()
     % Ampak še vedno izgleda dobro pri gridSize = 32. Druga komponenta v učni množici pa ne:
     V = niftiread('mito-endolyso.nii');
     V = V == 1;
-    V = imerode(V, strel("cube", 6));
+    V = imerode(V, strel("sphere", 3));
     CC = bwconncomp(V);
     numPixels = cellfun(@numel, CC.PixelIdxList);
     [~, indices] = sort(numPixels, 'descend');
