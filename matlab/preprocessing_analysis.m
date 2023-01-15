@@ -53,15 +53,29 @@ function [] = resizing_analysis()
     resizingDir = fullfile(cachedir, 'analysis', 'resizing');
 
     % Tole je zadnja oblika v testni množici. Je najbolj "kompleksna".
-    V = niftiread('branched/fib1-4-3-0.nii.gz');
+    % V = niftiread('branched/fib1-4-3-0.nii.gz');
+    % Ampak še vedno izgleda dobro pri gridSize = 32. Druga komponenta v učni množici pa ne:
+    V = niftiread('mito-endolyso.nii');
     V = V == 1;
+    V = imerode(V, strel("cube", 6));
     CC = bwconncomp(V);
     numPixels = cellfun(@numel, CC.PixelIdxList);
-    [~, argmax] = max(numPixels);
+    [~, indices] = sort(numPixels, 'descend');
 
     X = zeros(size(V));
-    X(CC.PixelIdxList{argmax}) = 1;
+    % X(CC.PixelIdxList{indices(1)}) = 1;
+    X(CC.PixelIdxList{indices(2)}) = 1;
     cropped = regionprops(X, "FilledImage").FilledImage;
+
+    [FV, ~] = Voxel2mesh(cropped);
+    faces = FV.faces;
+
+    maxSize = max(size(cropped));
+    normalizedVertices = (FV.vertices - 0.5) / maxSize;
+    vertices = normalizedVertices - 0.5;
+
+    resizingFile = fullfile(resizingDir, 'original.mat');
+    save(resizingFile, 'vertices', 'faces')
 
     resizing_analysis_helper(cropped, 32, resizingDir);
     resizing_analysis_helper(cropped, 64, resizingDir);
