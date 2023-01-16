@@ -122,12 +122,12 @@ def train(network, train_batches, validation_batches, params, stats):
             print(f'    validation loss: {validation_loss}')
             print(f'    best validation loss: {best_validation_loss}')
         else:
+            total_iou = .0
+            n = 0
+
             network.eval()
 
             with torch.no_grad():
-                total_iou = .0
-                n = 0
-
                 for (volume, _, _) in validation_batches.get_all_batches():
                     P = network(volume)
                     P.exist = P.prob > .5
@@ -135,7 +135,11 @@ def train(network, train_batches, validation_batches, params, stats):
                     total_iou += iou(volume, P, params).sum()
                     n += volume.size(0)
 
-                stats.validation_loss[j] = total_iou / n
+            network.train()
+
+            mean_iou = total_iou / n
+            stats.validation_loss[j] = mean_iou
+            print(f'    test IoU: {mean_iou}')
 
             torch.save(network.state_dict(), 'results/tulsiani/save.torch')
 

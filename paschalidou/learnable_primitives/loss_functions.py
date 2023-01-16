@@ -157,6 +157,41 @@ def sample_uniformly_from_cubes_surface(shape_params, epsilons, sampler):
     return X_SQ, normals
 
 
+def points_inside_superquadrics(gt_points, y_hat):
+    # Declare some variables
+    B = gt_points.shape[0]  # batch size
+    N = gt_points.shape[1]  # number of points per sample
+    M = y_hat[0].shape[1]  # number of primitives
+
+    probs = y_hat[0].view(B, M)
+    translations = y_hat[1].view(B, M, 3)
+    rotations = y_hat[2].view(B, M, 4)
+    shapes = y_hat[3].view(B, M, 3)
+    epsilons = y_hat[4].view(B, M, 2)
+    tapering_params = y_hat[5].view(B, M, 2)
+
+    exist = probs > .5
+
+    # Transform the 3D points from world-coordinates to primitive-centric
+    # coordinates with size BxNxMx3
+    X_transformed = transform_to_primitives_centric_system(
+        gt_points,
+        translations,
+        rotations
+    )
+
+    F = inside_outside_function(
+        X_transformed,
+        shapes,
+        epsilons
+    )
+
+    inside = F <= 1 & exist.unsqueeze(1).repeat(1, N, 1)
+    inside_any, _ = inside.max(-1)
+
+    return inside_any
+
+
 def euclidean_dual_loss(
     y_hat,
     y_target,

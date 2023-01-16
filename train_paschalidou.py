@@ -23,9 +23,10 @@ from paschalidou.scripts.output_logger import get_logger
 from paschalidou.learnable_primitives.equal_distance_sampler_sq import get_sampler
 from paschalidou.learnable_primitives.models import NetworkParameters, train_on_batch, \
     optimizer_factory
-from paschalidou.learnable_primitives.loss_functions import euclidean_dual_loss
+from paschalidou.learnable_primitives.loss_functions import euclidean_dual_loss, points_inside_superquadrics
 
 from common.batch_provider import BatchProvider, BatchProviderParams
+from common.iou import points_inside_volume
 
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
@@ -91,6 +92,18 @@ def save_experiment_params(args, experiment_tag, directory):
         json.dump(params, f, indent=4)
 
 
+def iou(volume, y_hat, args):
+    points = torch.rand(volume.size(0), args.iou_n_points, 3) - .5
+
+    inside_primitive = points_inside_superquadrics(points, y_hat)
+
+    inside_volume = points_inside_volume(points, volume)
+
+    intersection = (inside_primitive & inside_volume).sum(-1)
+    union = (inside_primitive | inside_volume).sum(-1)
+
+    return intersection / union
+
 def main(argv):
     parser = argparse.ArgumentParser(
         description="Train a network to predict primitives"
@@ -109,6 +122,16 @@ def main(argv):
         default="results/paschalidou",
         help="Save the output files in that directory"
     )
+    parser.add_argument(
+        "--dont_use_split",
+        action="store_true",
+        help="Brez validacijske in testne množice"
+    )
+    parser.add_argument(
+        "--iou_n_points",
+        default=10000,
+        type=int,
+    )
 
     parser.add_argument(
         "--weight_file",
@@ -125,7 +148,7 @@ def main(argv):
     parser.add_argument(
         "--n_primitives",
         type=int,
-        default=16, # 32, # Za 32 je premalo VRAM-a.
+        default=20, # Za 32 je premalo VRAM-a.
         help="Number of primitives"
     )
     parser.add_argument(
@@ -225,7 +248,10 @@ def main(argv):
     )
 
     train_set = load_preprocessed(args.train_dir)
-    validation_set, _ = load_urocell_preprocessed(args.urocell_dir)
+    validation_set, test_set = load_urocell_preprocessed(args.urocell_dir)
+
+    if args.dont_use_split:
+        train_set += validation_set + test_set
 
     batch_params = BatchProviderParams(
         device,
@@ -236,15 +262,22 @@ def main(argv):
     train_batches = BatchProvider(
         train_set,
         batch_params,
-        store_on_gpu = False,
-        uses_point_sampling = True
+        store_on_gpu = False
     )
-    validation_batches = BatchProvider(
-        validation_set,
-        batch_params,
-        store_on_gpu = False,
-        uses_point_sampling = True
-    )
+
+    if args.dont_use_split:
+        # V bistvu so to v tem primeru paketi iz testne množice ("test batches")...
+        validation_batches = BatchProvider(
+            test_set,
+            batch_params,
+            store_on_gpu = True
+        )
+    else:
+        validation_batches = BatchProvider(
+            validation_set,
+            batch_params,
+            store_on_gpu = False
+        )
 
     network_params = NetworkParameters.from_options(args)
     # Build the model to be used for training
@@ -343,28 +376,23 @@ def main(argv):
         # Finish the progress bar and save the model after every epoch
         bar.finish()
 
-        val_loss_sum = .0
-        val_set_size = 0
-        for batch in validation_batches.get_all_batches(shuffle = False):
-            X, y_target = batch[:2]
-            X = X.unsqueeze(1)
+        if args.dont_use_split:
+            total_iou = .0
+            n = 0
 
-            y_hat = model(X)
-            loss, _ = euclidean_dual_loss(
-                y_hat,
-                y_target,
-                get_regularizer_terms(args, i),
-                sampler,
-                get_loss_options(args)
-            )
+            network.eval()
 
-            val_loss_sum += loss.item() * X.size(0)
-            val_set_size += X.size(0)
+            with torch.no_grad():
+                for (volume, X, _) in validation_batches.get_all_batches():
+                    y_hat = model(X)
 
-        val_loss = val_loss_sum / val_set_size
-        print(val_loss)
-        if val_loss < min_val_loss:
-            min_val_loss = val_loss
+                    total_iou += iou(volume, y_hat, args).sum()
+                    n += volume.size(0)
+
+            network.train()
+
+            mean_iou = total_iou / n
+            print(f'epoch {i + 1}, mean IoU = {mean_iou}')
 
             torch.save(
                 model.state_dict(),
@@ -373,6 +401,43 @@ def main(argv):
                     "model.torch" # _%d" % (i + args.continue_from_epoch,)
                 )
             )
+        else:
+            val_loss_sum = .0
+            val_set_size = 0
+
+            network.eval()
+
+            with torch.no_grad():
+                for batch in validation_batches.get_all_batches(shuffle = False):
+                    X, y_target = batch[:2]
+                    X = X.unsqueeze(1)
+
+                    y_hat = model(X)
+                    loss, _ = euclidean_dual_loss(
+                        y_hat,
+                        y_target,
+                        get_regularizer_terms(args, i),
+                        sampler,
+                        get_loss_options(args)
+                    )
+
+                    val_loss_sum += loss.item() * X.size(0)
+                    val_set_size += X.size(0)
+
+            network.train()
+
+            val_loss = val_loss_sum / val_set_size
+            print(val_loss)
+            if val_loss < min_val_loss:
+                min_val_loss = val_loss
+
+                torch.save(
+                    model.state_dict(),
+                    os.path.join(
+                        experiment_directory,
+                        "model.torch" # _%d" % (i + args.continue_from_epoch,)
+                    )
+                )
 
     print [
         sum(losses[args.steps_per_epoch:]) / float(args.steps_per_epoch),
