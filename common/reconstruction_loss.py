@@ -4,23 +4,28 @@ import torch.nn.functional as F
 from .transform import world_to_primitive_space, primitive_to_world_space
 from .cuboid import CuboidSurface
 
-def points_to_primitives_distance_squared(P, shape_points):
+def points_to_primitives_distance_squared(P, shape_points, use_chamfer = False):
     [b, p] = P.dims.size()[:2]
     n = shape_points.size(1)
     points = shape_points.unsqueeze(1).repeat(1, p, 1, 1)
     points = world_to_primitive_space(points, P.quat, P.trans)
 
     dims = P.dims.unsqueeze(2).repeat(1, 1, n, 1)
-    return F.relu(points.abs() - dims).pow(2).sum(-1)
+    dist = points.abs() - dims
 
-def _coverage(P, shape_points):
-    distance = points_to_primitives_distance_squared(P, shape_points)
+    if not use_chamfer:
+        dist = F.relu(dist)
+
+    return dist.pow(2).sum(-1)
+
+def coverage(P, shape_points, use_chamfer = False):
+    distance = points_to_primitives_distance_squared(P, shape_points, use_chamfer)
     distance += 10 * (1 - P.exist.unsqueeze(-1))
     distance, _ = distance.min(1)
     return distance
 
-def coverage(P, shape_points):
-    return _coverage(P, shape_points).mean(1)
+def coverage(P, shape_points, params):
+    return _coverage(P, shape_points, params.use_chamfer).mean(1)
 
 def point_indices(points, volume):
     [b, grid_size] = volume.size()[:2]
@@ -32,8 +37,8 @@ def point_indices(points, volume):
     w = grid_size * i[..., 1]
     return u.reshape(-1, 1, 1) + w + v + i[..., 2]
 
-def _consistency(volume, P, closest_points_grid, n_samples_per_primitive, expected_value = False):
-    sampler = CuboidSurface(n_samples_per_primitive)
+def _consistency(volume, P, closest_points_grid, params, expected_value = False):
+    sampler = CuboidSurface(params.n_samples_per_primitive)
 
     primitive_points = sampler.sample_points(P.dims)
     primitive_points = primitive_to_world_space(primitive_points, P.quat, P.trans)
@@ -47,19 +52,21 @@ def _consistency(volume, P, closest_points_grid, n_samples_per_primitive, expect
     distance = (closest_points - primitive_points).pow(2).sum(-1)
 
     # Ko je točka znotraj polnega voksla, naj bo razdalja nič:
-    distance *= 1 - volume.take(i)
+    if not params.use_chamfer:
+        distance *= 1 - volume.take(i)
 
     return distance, weights
 
-def consistency(volume, P, closest_points_grid, n_samples_per_primitive, expected_value = False):
-    distance, weights = _consistency(volume, P, closest_points_grid, n_samples_per_primitive, expected_value)
+def consistency(volume, P, closest_points_grid, params, expected_value = False):
+    distance, weights = _consistency(volume, P, closest_points_grid, params, expected_value)
     return (distance * weights).sum((1, 2))
 
-def reconstruction_loss(volume, primitives, shape_points, closest_points_grid, n_samples_per_primitive):
-    cov = coverage(primitives, shape_points)
-    cons = consistency(volume, primitives, closest_points_grid, n_samples_per_primitive)
+def reconstruction_loss(volume, primitives, shape_points, closest_points_grid, params):
+    cov = coverage(primitives, shape_points, params)
+    cons = consistency(volume, primitives, closest_points_grid, params)
     return cov, cons
 
+# Tega ne uporabljamo:
 def paschalidou_reconstruction_loss(volume, P, shape_points, closest_points_grid, params):
     distance = points_to_primitives_distance_squared(P, shape_points)
     distance = distance.transpose(1, 2)

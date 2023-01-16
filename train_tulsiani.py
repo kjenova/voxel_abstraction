@@ -10,6 +10,7 @@ from tulsiani.stats import TulsianiStats
 
 from common.batch_provider import BatchProvider
 from common.reconstruction_loss import reconstruction_loss, paschalidou_reconstruction_loss, paschalidou_parsimony_loss
+from common.iou import iou
 
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
@@ -29,7 +30,7 @@ def train(network, train_batches, validation_batches, params, stats):
         volume, sampled_points, closest_points = train_batches.get()
         P = network(volume)
 
-        if params.use_paschalidou_loss:
+        if params.use_paschalidou_loss: # Tega ne uporabljamo.
             cov, cons = paschalidou_reconstruction_loss(volume, P, sampled_points, closest_points, params)
             parsimony = paschalidou_parsimony_loss(P, params)
 
@@ -39,7 +40,7 @@ def train(network, train_batches, validation_batches, params, stats):
 
             stats.parsimony[i] = parsimony.mean()
         else:
-            cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params.n_samples_per_primitive)
+            cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params)
             loss = cov + cons
 
             total_penalty = .0
@@ -69,24 +70,27 @@ def train(network, train_batches, validation_batches, params, stats):
         stats.cons[i] = cons.mean()
         i += 1
 
-        if i % params.save_iteration == 0:
-            cov_mean = stats.cov[i - params.save_iteration : i].mean()
-            cons_mean = stats.cons[i - params.save_iteration : i].mean()
-            parsimony_mean = stats.parsimony[i - params.save_iteration : i].mean()
-            mean_prob = stats.prob_means[i - params.save_iteration : i].mean()
-            mean_dim = stats.dim_means[i - params.save_iteration : i].mean()
-            mean_trans_std = stats.trans_stds[i - params.save_iteration : i].mean()
-            mean_penalty = stats.penalty_means[i - params.save_iteration : i].mean()
+        if i % params.save_iteration != 0:
+            continue
 
-            print(f'---- iteration {i} ----')
-            print(f'    loss {cov_mean + cons_mean + parsimony_mean}, cov: {cov_mean}, cons: {cons_mean}')
-            print(f'    mean prob: {mean_prob}, mean dim: {mean_dim}, trans std: {mean_trans_std}')
+        cov_mean = stats.cov[i - params.save_iteration : i].mean()
+        cons_mean = stats.cons[i - params.save_iteration : i].mean()
+        parsimony_mean = stats.parsimony[i - params.save_iteration : i].mean()
+        mean_prob = stats.prob_means[i - params.save_iteration : i].mean()
+        mean_dim = stats.dim_means[i - params.save_iteration : i].mean()
+        mean_trans_std = stats.trans_stds[i - params.save_iteration : i].mean()
+        mean_penalty = stats.penalty_means[i - params.save_iteration : i].mean()
 
-            if params.use_paschalidou_loss:
-                print(f'    parsimony {parsimony_mean}')
-            else:
-                print(f'    mean penalty: {mean_penalty}')
+        print(f'---- iteration {i} ----')
+        print(f'    loss {cov_mean + cons_mean + parsimony_mean}, cov: {cov_mean}, cons: {cons_mean}')
+        print(f'    mean prob: {mean_prob}, mean dim: {mean_dim}, trans std: {mean_trans_std}')
 
+        if params.use_paschalidou_loss:
+            print(f'    parsimony {parsimony_mean}')
+        else:
+            print(f'    mean penalty: {mean_penalty}')
+
+        if params.use_split:
             validation_loss = .0
 
             network.eval()
@@ -101,7 +105,7 @@ def train(network, train_batches, validation_batches, params, stats):
 
                         validation_loss += (cov + cons + parsimony).sum()
                     else:
-                        cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params.n_samples_per_primitive)
+                        cov, cons = reconstruction_loss(volume, P, sampled_points, closest_points, params)
                         validation_loss += (cov + cons).sum() # .sum() zato, ker kasneje delimo.
 
             network.train()
@@ -117,6 +121,23 @@ def train(network, train_batches, validation_batches, params, stats):
 
             print(f'    validation loss: {validation_loss}')
             print(f'    best validation loss: {best_validation_loss}')
+        else:
+            network.eval()
+
+            with torch.no_grad():
+                total_iou = .0
+                n = 0
+
+                for (volume, _, _) in validation_batches.get_all_batches():
+                    P = network(volume)
+                    P.exist = P.prob > .5
+
+                    total_iou += iou(volume, P, params).sum()
+                    n += volume.size(0)
+
+                stats.validation_loss[j] = total_iou / n
+
+            torch.save(network.state_dict(), 'results/tulsiani/save.torch')
 
 try:
     os.makedirs('results/tulsiani/graphs')
@@ -127,10 +148,19 @@ train_set = load_preprocessed(params.train_dir)
 
 params.grid_size = train_set[0].resized_volume.shape[0]
 
-validation_set, _ = load_urocell_preprocessed(params.urocell_dir)
+validation_set, test_set = load_urocell_preprocessed(params.urocell_dir)
+
+if not params.use_split:
+    train_set += validation_set + test_set
 
 train_batches = BatchProvider(train_set, params, store_on_gpu = False)
-validation_batches = BatchProvider(validation_set, params, store_on_gpu = False)
+
+if not params.use_split:
+    validation_batches = BatchProvider(validation_set, params, store_on_gpu = False)
+else:
+    # validation_batches = None
+    # Quick and dirty za graf IoU...
+    validation_batches = BatchProvider(test_set, params, store_on_gpu = True)
 
 stats = TulsianiStats(params)
 

@@ -32,6 +32,9 @@ params = TulsianiParams()
 params.train_dir = 'data/chamferData/01'
 params.urocell_dir = 'data/chamferData/urocell'
 
+# Ali naj imamo sploh ločeno učno, validacijsko in testno množico?
+params.use_split = True
+
 # Število iteracij treniranja v prvi in drugi fazi:
 params.n_iterations = [20000, 30000]
 # Toliko iteracij se vsak batch ponovi (t.j. po tolikšnem številu
@@ -49,6 +52,8 @@ params.n_primitives = 20
 # vgendar naenkrat bomo upoštevali samo 1000 naključnih točk:
 params.n_samples_per_shape = 1000
 params.n_samples_per_primitive = 150
+
+params.iou_n_points = 10000
 
 params.batch_size = 32
 params.use_batch_normalization_conv = True
@@ -76,7 +81,13 @@ params.prob_factors = [0.0001, 0.2]
 # V drugi fazi tudi rahlo penaliziramo prisotnost.
 params.existence_penalties = [.0, 8e-5]
 
-params.use_paschalidou_loss = True
+# Ko je 'use_chamfer = True', polj razdalj v notranjosti ne nastavimo na nič
+# (enako kot isto imenska opcija pri metodi Paschalidou). Paschalidou in sod. 
+# so ugotovili, da tako zaidemo v manj lokalnih minimumov...
+params.use_chamfer = False
+
+# Tega ne uporabljamo:
+params.use_paschalidou_loss = False
 params.paschalidou_n_iterations = 15000
 params.paschalidou_alpha = 1.
 params.paschalidou_beta = 1e-3
