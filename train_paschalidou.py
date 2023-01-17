@@ -128,6 +128,14 @@ def main(argv):
         help="Brez validacijske in testne množice"
     )
     parser.add_argument(
+        "--add_coordinates_to_encoder",
+        action="store_true"
+    )
+    parser.add_argument(
+        "--sqrt_in_parsimony_loss",
+        action="store_true"
+    )
+    parser.add_argument(
         "--iou_n_points",
         default=10000,
         type=int,
@@ -266,18 +274,19 @@ def main(argv):
     )
 
     if args.dont_use_split:
-        # V bistvu so to v tem primeru paketi iz testne množice ("test batches")...
-        validation_batches = BatchProvider(
-            test_set,
-            batch_params,
-            store_on_gpu = True
-        )
+        validation_batches = None
     else:
         validation_batches = BatchProvider(
             validation_set,
             batch_params,
             store_on_gpu = False
         )
+
+    test_batches = BatchProvider(
+        test_set,
+        batch_params,
+        store_on_gpu = True
+    )
 
     network_params = NetworkParameters.from_options(args)
     # Build the model to be used for training
@@ -377,23 +386,6 @@ def main(argv):
         bar.finish()
 
         if args.dont_use_split:
-            total_iou = .0
-            n = 0
-
-            network.eval()
-
-            with torch.no_grad():
-                for (volume, X, _) in validation_batches.get_all_batches():
-                    y_hat = model(X)
-
-                    total_iou += iou(volume, y_hat, args).sum()
-                    n += volume.size(0)
-
-            network.train()
-
-            mean_iou = total_iou / n
-            print(f'epoch {i + 1}, mean IoU = {mean_iou}')
-
             torch.save(
                 model.state_dict(),
                 os.path.join(
@@ -438,6 +430,31 @@ def main(argv):
                         "model.torch" # _%d" % (i + args.continue_from_epoch,)
                     )
                 )
+
+        total_iou = .0
+        n = 0
+
+        network.eval()
+
+        with torch.no_grad():
+            for (volume, X, _) in test_batches.get_all_batches():
+                y_hat = model(X)
+
+                total_iou += iou(volume, y_hat, args).sum()
+                n += volume.size(0)
+
+        network.train()
+
+        mean_iou = total_iou / n
+        print(f'epoch {i + 1}, mean IoU = {mean_iou}')
+
+        torch.save(
+            model.state_dict(),
+            os.path.join(
+                experiment_directory,
+                "model.torch" # _%d" % (i + args.continue_from_epoch,)
+            )
+        )
 
     print [
         sum(losses[args.steps_per_epoch:]) / float(args.steps_per_epoch),

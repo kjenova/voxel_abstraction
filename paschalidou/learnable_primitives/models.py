@@ -12,7 +12,8 @@ class NetworkParameters(object):
                  use_sq=False, make_dense=False,
                  use_deformations=False,
                  train_with_bernoulli=False,
-                 grid_shape=None):
+                 grid_shape=None,
+                 add_coordinates_to_encoder=False):
         self.architecture = architecture
         self.n_primitives = n_primitives
         self.train_with_bernoulli = train_with_bernoulli
@@ -26,6 +27,7 @@ class NetworkParameters(object):
         self.use_deformations = use_deformations
         self.make_dense = make_dense
         self.grid_shape = grid_shape
+        self.add_coordinates_to_encoder = add_coordinates_to_encoder
 
     @classmethod
     def from_options(cls, argument_parser):
@@ -56,6 +58,7 @@ class NetworkParameters(object):
             train_with_bernoulli=train_with_bernoulli,
             make_dense=make_dense,
             grid_shape=args["grid_shape"]
+            add_coordinates_to_encoder=args.get("add_coordinates_to_encoder", False)
         )
 
     @property
@@ -91,13 +94,19 @@ class NetworkParameters(object):
         return modules
 
 
+def voxel_center_points(n, device):
+    c = torch.linspace(-.5 + .5 / n, .5 - .5 / n, n, device = device)
+    return torch.cartesian_prod(c, c, c)
+
+center_points = None
+
 class TulsianiNetwork(nn.Module):
     def __init__(self, network_params):
         super(TulsianiNetwork, self).__init__()
         self._network_params = network_params
 
         # Initialize some useful variables
-        n_filters = 4
+        n_filters = 8 if network_params.add_coordinates_to_encoder else 4
         input_channels = 1
 
         encoder_layers = []
@@ -132,6 +141,17 @@ class TulsianiNetwork(nn.Module):
         )
 
     def forward(self, X):
+        global center_points
+
+        if self._network_params.add_coordinates_to_encoder:
+            n = X.size(2)
+
+            if center_points is None:
+                center_points = voxel_center_points(n, X.device).transpose(0, 1)
+
+            c = center_points.reshape(1, 3, n, n, n).repeat(X.size(0), 1, 1, 1, 1)
+            X = torch.cat((X, c), dim = 1)
+
         x = self._features_extractor(X)
         return self._primitive_layer(x)
 

@@ -17,6 +17,7 @@ class TulsianiStats:
         self.save_iteration = params.save_iteration
         self.m = self.n // self.save_iteration
         self.validation_loss = np.zeros(self.m)
+        self.test_iou = np.zeros(self.m)
 
     def save_plots(self, directory):
         x = np.arange(1, self.n + 1)
@@ -50,6 +51,13 @@ class TulsianiStats:
         plt.ylabel('loss')
         plt.legend()
         plt.savefig(f'{directory}/loss.png')
+
+        plt.clf()
+        plt.figure(figsize = (20, 5))
+        plt.plot(v, self.test_iou)
+        plt.xlabel('iteration')
+        plt.ylabel('test IoU')
+        plt.savefig(f'{directory}/iou.png')
 
         plt.clf()
         plt.figure(figsize = (20, 5))

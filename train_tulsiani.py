@@ -15,7 +15,7 @@ from common.iou import iou
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
 
-def train(network, train_batches, validation_batches, params, stats):
+def train(network, train_batches, validation_batches, test_batches, params, stats):
     optimizer = torch.optim.Adam(network.parameters(), lr = params.learning_rate)
     reinforce_updater = ReinforceRewardUpdater(params.reinforce_baseline_momentum)
 
@@ -90,6 +90,8 @@ def train(network, train_batches, validation_batches, params, stats):
         else:
             print(f'    mean penalty: {mean_penalty}')
 
+        j = train_batches.iteration // params.save_iteration - 1
+
         if params.use_split:
             validation_loss = .0
 
@@ -116,32 +118,31 @@ def train(network, train_batches, validation_batches, params, stats):
                 best_validation_loss = validation_loss
                 torch.save(network.state_dict(), 'results/tulsiani/save.torch')
 
-            j = train_batches.iteration // params.save_iteration - 1
             stats.validation_loss[j] = validation_loss
 
             print(f'    validation loss: {validation_loss}')
             print(f'    best validation loss: {best_validation_loss}')
         else:
-            total_iou = .0
-            n = 0
-
-            network.eval()
-
-            with torch.no_grad():
-                for (volume, _, _) in validation_batches.get_all_batches():
-                    P = network(volume)
-                    P.exist = P.prob > .5
-
-                    total_iou += iou(volume, P, params).sum()
-                    n += volume.size(0)
-
-            network.train()
-
-            mean_iou = total_iou / n
-            stats.validation_loss[j] = mean_iou
-            print(f'    test IoU: {mean_iou}')
-
             torch.save(network.state_dict(), 'results/tulsiani/save.torch')
+
+        total_iou = .0
+        n = 0
+
+        network.eval()
+
+        with torch.no_grad():
+            for (volume, _, _) in validation_batches.get_all_batches():
+                P = network(volume)
+                P.exist = P.prob > .5
+
+                total_iou += iou(volume, P, params).sum()
+                n += volume.size(0)
+
+        network.train()
+
+        mean_iou = total_iou / n
+        stats.test_iou[j] = mean_iou
+        print(f'    test IoU: {mean_iou}')
 
 try:
     os.makedirs('results/tulsiani/graphs')
@@ -159,12 +160,12 @@ if not params.use_split:
 
 train_batches = BatchProvider(train_set, params, store_on_gpu = False)
 
-if not params.use_split:
+if params.use_split:
     validation_batches = BatchProvider(validation_set, params, store_on_gpu = False)
 else:
-    # validation_batches = None
-    # Quick and dirty za graf IoU...
-    validation_batches = BatchProvider(test_set, params, store_on_gpu = True)
+    validation_batches = None
+
+test_batches = BatchProvider(test_set, params, store_on_gpu = True)
 
 stats = TulsianiStats(params)
 
@@ -172,7 +173,7 @@ params.phase = 0
 network = TulsianiNetwork(params)
 network.to(params.device)
 
-train(network, train_batches, validation_batches, params, stats)
+train(network, train_batches, validation_batches, test_batches, params, stats)
 
 if not params.use_paschalidou_loss:
     params.phase = 1
@@ -181,6 +182,6 @@ if not params.use_paschalidou_loss:
     scale_weights(network, params)
     network.to(params.device)
 
-    train(network, train_batches, validation_batches, params, stats)
+    train(network, train_batches, validation_batches, test_batches, params, stats)
 
 stats.save_plots('results/tulsiani/graphs')

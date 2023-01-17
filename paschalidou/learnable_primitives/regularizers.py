@@ -35,9 +35,12 @@ def sparsity(parameters, minimum_number_of_primitives,
     return (w1*t1 + w2*t2).mean()
 
 
-def parsimony(parameters):
+def parsimony(parameters, use_sqrt):
     """Penalize the use of more primitives"""
     expected_primitives = parameters[0].sum(-1)
+
+    if use_sqrt:
+        expected_primitives = expected_primitives.sqrt()
 
     return expected_primitives.mean()
 
@@ -92,7 +95,11 @@ def get(regularizer, parameters, F, X_SQ, arguments):
             arguments.get("w1", None),
             arguments.get("w2", None)
         ),
-        "parsimony_regularizer": partial(parsimony, parameters),
+        "parsimony_regularizer": partial(
+            parsimony,
+            parameters,
+            arguments.get("sqrt_in_parsimony_loss", False)
+        ),
         "entropy_bernoulli_regularizer": partial(
             entropy_bernoulli,
             parameters
