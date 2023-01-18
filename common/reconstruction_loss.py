@@ -27,15 +27,22 @@ def _coverage(P, shape_points, use_chamfer = False):
 def coverage(P, shape_points, params):
     return _coverage(P, shape_points, params.use_chamfer).mean(1)
 
-def point_indices(points, volume):
+def _point_indices(points, volume):
     [b, grid_size] = volume.size()[:2]
+
+    u = grid_size ** 3 * torch.arange(0, b, device = volume.device)
+
     min_center = -.5 + .5 / grid_size
     i = (points - min_center) * grid_size
     i = i.clamp(0, grid_size - 1).round().long()
-    u = grid_size ** 3 * torch.arange(0, b, device = volume.device)
     v = grid_size ** 2 * i[..., 0]
     w = grid_size * i[..., 1]
-    return u.reshape(-1, 1, 1) + w + v + i[..., 2]
+
+    return u, w + v + i[..., 2]
+
+def point_indices(points, volume):
+    batch_indices, grid_indices = _point_indices(points, volume)
+    return batch_indices.reshape(-1, 1, 1) + grid_indices
 
 def _consistency(volume, P, closest_points_grid, params, expected_value = False):
     sampler = CuboidSurface(params.n_samples_per_primitive)

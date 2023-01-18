@@ -131,10 +131,12 @@ def train(network, train_batches, validation_batches, test_batches, params, stat
         network.eval()
 
         with torch.no_grad():
-            for (volume, _, _) in validation_batches.get_all_batches():
+            for (volume, _, _) in test_batches.get_all_batches():
                 P = network(volume)
                 P.exist = (P.prob > .5).long()
 
+                print(iou(volume, P, params).size())
+                print(volume.size())
                 total_iou += iou(volume, P, params).sum()
                 n += volume.size(0)
 
