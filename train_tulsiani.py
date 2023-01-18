@@ -133,7 +133,7 @@ def train(network, train_batches, validation_batches, test_batches, params, stat
         with torch.no_grad():
             for (volume, _, _) in validation_batches.get_all_batches():
                 P = network(volume)
-                P.exist = P.prob > .5
+                P.exist = (P.prob > .5).long()
 
                 total_iou += iou(volume, P, params).sum()
                 n += volume.size(0)
