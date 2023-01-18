@@ -135,8 +135,6 @@ def train(network, train_batches, validation_batches, test_batches, params, stat
                 P = network(volume)
                 P.exist = (P.prob > .5).long()
 
-                print(iou(volume, P, params).size())
-                print(volume.size())
                 total_iou += iou(volume, P, params).sum()
                 n += volume.size(0)
 
