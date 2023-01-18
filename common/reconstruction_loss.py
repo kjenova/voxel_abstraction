@@ -18,7 +18,7 @@ def points_to_primitives_distance_squared(P, shape_points, use_chamfer = False):
 
     return dist.pow(2).sum(-1)
 
-def coverage(P, shape_points, use_chamfer = False):
+def _coverage(P, shape_points, use_chamfer = False):
     distance = points_to_primitives_distance_squared(P, shape_points, use_chamfer)
     distance += 10 * (1 - P.exist.unsqueeze(-1))
     distance, _ = distance.min(1)
