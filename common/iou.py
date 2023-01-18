@@ -3,6 +3,10 @@ import torch.nn.functional as F
 
 from .reconstruction_loss import _coverage, _point_indices
 
+class IoUParams:
+    def __init__(self, iou_n_points = 10000):
+        self.iou_n_points = iou_n_points
+
 def points_inside_volume(points, volume):
     batch_indices, grid_indices = _point_indices(points, volume)
     i = batch_indices.reshape(-1, 1) + grid_indices

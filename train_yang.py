@@ -21,7 +21,7 @@ from tulsiani.reinforce import ReinforceRewardUpdater
 
 from common.batch_provider import BatchProvider, BatchProviderParams
 from common.reconstruction_loss import reconstruction_loss
-from common.iou import iou
+from common.iou import iou, IoUParams
 
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
@@ -55,10 +55,6 @@ class ReconstructionLossParams:
     def __init__(self, n_samples_per_primitive, use_chamfer):
         self.n_samples_per_primitive = n_samples_per_primitive
         self.use_chamfer = use_chamfer
-
-class IoUParams:
-    def __init__(self, iou_n_points = 10000):
-        self.iou_n_points = iou_n_points
 
 # Ko je euclidean dual loss = True, reconstruction loss-a ne računamo po
 # metodi Yang in Chen (ki upošteva normalne vektorje), temveč po "navadni"

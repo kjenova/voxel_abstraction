@@ -4,6 +4,8 @@ import torch
 from tulsiani.parameters import params
 from tulsiani.network import TulsianiNetwork
 
+from common.iou import iou, IoUParams
+
 def inference(dataset):
     params.grid_size = dataset[0].resized_volume.shape[0]
     params.phase = 0 if params.use_paschalidou_loss else 1
@@ -18,10 +20,21 @@ def inference(dataset):
 
     results = []
     with torch.no_grad():
+        total_iou = .0
+        n = 0
+
         for start in range(0, len(dataset), params.batch_size):
             batch = torch.stack(
                 [torch.Tensor(s.resized_volume) for s in dataset[start : start + params.batch_size]]
             )
-            results.append(model(batch))
+            P = model(batch)
+
+            results.append(P)
+
+            P.exist = (P.prob > .5).long()
+            total_iou += iou(batch, P, params).sum()
+            n += P.dims.size(0)
+
+        print(f'tulsiani test IoU: {total_iou / n}')
 
     return results
