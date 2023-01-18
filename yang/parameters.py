@@ -12,6 +12,8 @@ parser.add_argument('--E_train_dir', default = 'data/chamferData/01', type = str
 parser.add_argument('--E_urocell_dir', default = 'data/chamferData/urocell', type = str)
 parser.add_argument('--E_save_dir', default = 'results/yang', type = str)
 
+parser.add_argument('--E_dont_use_split', action = 'store_true')
+
 # Learning(L) hyper-parameters
 parser.add_argument('--L_base_lr', default = 6e-4, type = float, help = 'Learning rate')
 parser.add_argument('--L_adam_beta1', default = 0.9, type = float, help = 'Adam beta1')
@@ -36,6 +38,8 @@ parser.add_argument('--N_separate_primitive_encoding', action = 'store_true')
 # Če je ta flag nastavljen, se za reconstruction loss uporablja loss iz Tulsiani in sod., drugače
 # pa loss iz Yang in Chen (ki upošteva ujemanje normalnih vektorjev s ploskvami).
 parser.add_argument('--W_euclidean_dual_loss', action = 'store_true')
+# Ta parameter pride v poštev samo, ko je W_euclidean_dual_loss = True.
+parser.add_argument('--W_use_chamfer', action = 'store_true')
 # Se uporablja za reconstruction loss iz Tulsiani in sod.:
 parser.add_argument('--W_n_samples_per_primitive', default = 150, type = int)
 parser.add_argument('--W_REC', default = 1.00, type = float, help = 'REC loss weight')
@@ -44,6 +48,7 @@ parser.add_argument('--W_SPS', default = 0.10, type = float, help = 'SPS loss we
 parser.add_argument('--W_EXT', default = 0.01, type = float, help = 'EXT loss weight')
 parser.add_argument('--W_KLD', default = 6e-6, type = float, help = 'KLD loss weight')
 parser.add_argument('--W_CST', default = 0.00, type = float, help = 'CST loss weight, this loss is only for generation application')
+parser.add_argument('--W_min_importance_to_exist', default = 0.02, type = float)
 
 args = parser.parse_args()
 

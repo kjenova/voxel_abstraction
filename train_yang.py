@@ -20,7 +20,8 @@ from tulsiani.primitives import Primitives
 from tulsiani.reinforce import ReinforceRewardUpdater
 
 from common.batch_provider import BatchProvider, BatchProviderParams
-from common.reconstruction_loss import reconstruction_loss #, points_to_primitives_distance_squared, consistency
+from common.reconstruction_loss import reconstruction_loss
+from common.iou import iou
 
 from loader.load_preprocessed import load_preprocessed
 from loader.load_urocell import load_urocell_preprocessed
@@ -35,6 +36,29 @@ np.random.seed(seed)
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 torch.cuda.manual_seed_all(seed) 
+
+def get_primitives(out_dict, hypara):
+    assign_matrix = out_dict['assign_matrix'] # batch_size * n_points * n_cuboids
+    assigned_ratio = assign_matrix.mean(1)
+    assigned_existence = (assigned_ratio > hypara['W']['W_min_importance_to_exist']).to(torch.float32).detach()
+
+    # exist = out_dict_1['exist']
+    # exist = F.sigmoid(exist.reshape(exist.size(0), -1))
+    return Primitives(
+        out_dict_1['scale'] * .5, # krat .5 zaradi kompatibilnosti s Tulsiani...
+        out_dict_1['rotate_quat'],
+        out_dict_1['pc_assign_mean'], # out_dict_1['trans'],
+        assigned_existence
+    )
+
+class ReconstructionLossParams:
+    def __init__(self, n_samples_per_primitive, use_chamfer):
+        self.n_samples_per_primitive = n_samples_per_primitive
+        self.use_chamfer = use_chamfer
+
+class IoUParams:
+    def __init__(self, iou_n_points = 10000):
+        self.iou_n_points = iou_n_points
 
 # Ko je euclidean dual loss = True, reconstruction loss-a ne računamo po
 # metodi Yang in Chen (ki upošteva normalne vektorje), temveč po "navadni"
@@ -66,7 +90,8 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_upda
             torch.ones(prob.size(0), prob.size(1), device = prob.device),
         )
 
-        cov, cons = reconstruction_loss(volume, P, points, closest_points, hypara['W']['W_n_samples_per_primitive'])
+        params = ReconstructionLossParams(hypara['W']['W_n_samples_per_primitive'], hypara['W']['W_use_chamfer'])
+        cov, cons = reconstruction_loss(volume, P, points, closest_points, params)
 
         l = (cov + cons).mean()
 
@@ -83,18 +108,7 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_upda
             else:
                 l = r.mean()
     else:
-        assign_matrix = out_dict_1['assign_matrix'] # batch_size * n_points * n_cuboids
-        assigned_ratio = assign_matrix.mean(1)
-        assigned_existence = (assigned_ratio > .02).to(torch.float32).detach()
-
-        # exist = out_dict_1['exist']
-        # exist = F.sigmoid(exist.reshape(exist.size(0), -1))
-        P = Primitives(
-            out_dict_1['scale'] * .5, # krat .5 zaradi kompatibilnosti s Tulsiani...
-            out_dict_1['rotate_quat'],
-            out_dict_1['pc_assign_mean'], # out_dict_1['trans'],
-            assigned_existence
-        )
+        P = get_primitives(P, hypara)
 
         # distance = points_to_primitives_distance_squared(P, points) # batch_size * n_cuboids * n_points
         # cov = distance * assign_matrix.transpose(1, 2)
@@ -102,7 +116,8 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_upda
 
         # cons = consistency(volume, P, closest_points, hypara['W']['W_n_samples_per_primitive'])
 
-        cov, cons = reconstruction_loss(volume, P, points, closest_points, hypara['W']['W_n_samples_per_primitive'])
+        params = ReconstructionLossParams(hypara['W']['W_n_samples_per_primitive'], hypara['W']['W_use_chamfer'])
+        cov, cons = reconstruction_loss(volume, P, points, closest_points, params)
 
         l = (cov + cons).mean()
 
@@ -127,6 +142,9 @@ def main():
 
     train_set = load_preprocessed(hypara['E']['E_train_dir'])
     validation_set, test_set = load_urocell_preprocessed(hypara['E']['E_urocell_dir'])
+
+    if hypara['E']['E_dont_use_split']:
+        train_set += validation_set + test_set
 
     batch_params = BatchProviderParams(
         torch.device('cuda'),
@@ -201,27 +219,61 @@ def main():
 
             if batch_count % int(hypara['E']['E_freq_val_epoch'] * num_batch) == 0:
                 utils_pt.train_summaries(summary_writer, loss_dict, batch_count * hypara['L']['L_batch_size'])
-                best_eval_loss = validate(
-                    hypara,
-                    validation_batches,
-                    test_batches,
-                    Network,
-                    loss_func,
-                    hypara['W'],
-                    save_path,
-                    batch_count,
-                    epoch,
-                    summary_writer,
-                    best_eval_loss,
-                    color
-                )
+
+                new_best = hypara['E']['E_dont_use_split']
+
+                if not hypara['E']['E_dont_use_split']:
+                    eval_loss = validate(
+                        hypara,
+                        validation_batches,
+                        Network,
+                        loss_func,
+                        save_path,
+                        batch_count,
+                        summary_writer,
+                        color
+                    )
+
+                    if eval_loss < best_eval_loss:
+                        best_eval_loss = eval_loss
+                        new_best = True
+
+                if not new_best:
+                    continue
+
+                model_name = utils_pt.create_name(batch_count, loss_dict)
+                torch.save(Network.state_dict(), save_path + '/' + model_name + '.pth')
+
+                Network.eval()
+
+                with torch.no_grad():
+                    save_points = next(test_batches.get_all_batches(shuffle = False))[1]
+                    save_dict = Network(pc = save_points)
+
+                    P = get_primitives(save_dict, hypara)
+                    mean_iou = iou(data[0], P, IoUParams())
+                    print(f'iter = {batch_count}, test IoU = {mean_iou}')
+
                 Network.train()
 
-def validate(hypara, validation_batches, test_batches, Network, loss_func, loss_weight, save_path, iter, epoch, summary_writer, best_eval_loss, color):
-    Network.eval()
+                vertices, faces = utils_pt.generate_cube_mesh_batch(save_dict['verts_forward'], save_dict['cube_face'], hypara['L']['L_batch_size'])
+                utils_pt.visualize_segmentation(save_points, color, save_dict['assign_matrix'], save_path + '/log/', 0, None)
+                utils_pt.visualize_cubes(vertices, faces, color, save_path + '/log/', 0, '', None)
+                utils_pt.visualize_cubes_masked(vertices, faces, color, save_dict['assign_matrix'], save_path + '/log/', 0, '', None)
+
+                vertices_pred, faces_pred = utils_pt.generate_cube_mesh_batch(save_dict['verts_predict'], save_dict['cube_face'], hypara['L']['L_batch_size'])
+                utils_pt.visualize_cubes(vertices_pred, faces_pred, color, save_path + '/log/', 0, 'pred', None)
+                utils_pt.visualize_cubes_masked(vertices_pred, faces_pred, color, save_dict['assign_matrix'], save_path + '/log/', 0, 'pred', None)
+                utils_pt.visualize_cubes_masked_pred(vertices_pred, faces_pred, color, save_dict['exist'], save_path + '/log/', 0, None)
+
+
+def validate(hypara, validation_batches, Network, loss_func, save_path, iter, summary_writer, color):
     loss_dict = {}
-    for j, data in enumerate(validation_batches.get_all_batches(shuffle = False)):
-        with torch.no_grad():
+
+    Network.eval()
+
+    with torch.no_grad():
+        for j, data in enumerate(validation_batches.get_all_batches(shuffle = False)):
             volume, points, closest_points, normals = data
 
             outdict = Network(pc = points)
@@ -233,34 +285,15 @@ def validate(hypara, validation_batches, test_batches, Network, loss_func, loss_
             else:
                 loss_dict = cur_loss_dict
 
+    Network.train()
+
     for key in loss_dict:
         loss_dict[key] = loss_dict[key] / (j+1)
 
     utils_pt.print_text(loss_dict, save_path, is_train = False)
     utils_pt.valid_summaries(summary_writer, loss_dict, iter * hypara['L']['L_batch_size'])
 
-    with torch.no_grad():
-        save_points = next(test_batches.get_all_batches(shuffle = False))[1]
-        save_dict = Network(pc = save_points)
-
-    if loss_dict['eval'] < best_eval_loss:
-        best_eval_loss = copy.deepcopy(loss_dict['eval'])
-        print('eval: ',best_eval_loss)
-        if epoch >= 0:
-            model_name = utils_pt.create_name(iter, loss_dict)
-            torch.save(Network.state_dict(), save_path + '/' + model_name + '.pth')
-
-            vertices, faces = utils_pt.generate_cube_mesh_batch(save_dict['verts_forward'], save_dict['cube_face'], hypara['L']['L_batch_size'])
-            utils_pt.visualize_segmentation(save_points, color, save_dict['assign_matrix'], save_path + '/log/', 0, None)
-            utils_pt.visualize_cubes(vertices, faces, color, save_path + '/log/', 0, '', None)
-            utils_pt.visualize_cubes_masked(vertices, faces, color, save_dict['assign_matrix'], save_path + '/log/', 0, '', None)
-
-            vertices_pred, faces_pred = utils_pt.generate_cube_mesh_batch(save_dict['verts_predict'], save_dict['cube_face'], hypara['L']['L_batch_size'])
-            utils_pt.visualize_cubes(vertices_pred, faces_pred, color, save_path + '/log/', 0, 'pred', None)
-            utils_pt.visualize_cubes_masked(vertices_pred, faces_pred, color, save_dict['assign_matrix'], save_path + '/log/', 0, 'pred', None)
-            utils_pt.visualize_cubes_masked_pred(vertices_pred, faces_pred, color, save_dict['exist'], save_path + '/log/', 0, None)
-    
-    return best_eval_loss
+    return loss_dict['eval']
 
 if __name__ == '__main__':
     main()

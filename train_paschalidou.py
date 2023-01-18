@@ -446,7 +446,7 @@ def main(argv):
         network.train()
 
         mean_iou = total_iou / n
-        print(f'epoch {i + 1}, mean IoU = {mean_iou}')
+        print("epoch " + str(i + 1) + ", mean IoU = " + str(mean_iou))
 
         torch.save(
             model.state_dict(),
