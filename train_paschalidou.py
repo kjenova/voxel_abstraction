@@ -100,8 +100,8 @@ def iou(volume, y_hat, args):
 
     inside_volume = points_inside_volume(points, volume)
 
-    intersection = (inside_primitive & inside_volume).sum(-1)
-    union = (inside_primitive | inside_volume).sum(-1)
+    intersection = (inside_primitive & inside_volume).sum(-1).float()
+    union = (inside_primitive | inside_volume).sum(-1).float()
 
     return intersection / union
 
