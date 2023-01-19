@@ -10,7 +10,7 @@ class IoUParams:
 def points_inside_volume(points, volume):
     batch_indices, grid_indices = _point_indices(points, volume)
     i = batch_indices.reshape(-1, 1) + grid_indices
-    return volume.reshape(-1)[i] > 0
+    return volume.take(i) > 0
 
 def iou(volume, P, params):
     points = torch.rand(P.dims.size(0), params.iou_n_points, 3, device = volume.device) - .5
