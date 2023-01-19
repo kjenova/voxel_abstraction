@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 #!/usr/bin/env python
 """Script used to train the network for representing a 3D object as a set of
 primitives
@@ -93,7 +94,7 @@ def save_experiment_params(args, experiment_tag, directory):
 
 
 def iou(volume, y_hat, args):
-    points = torch.rand(volume.size(0), args.iou_n_points, 3) - .5
+    points = torch.rand(volume.size(0), args.iou_n_points, 3, device = volume.device) - .5
 
     inside_primitive = points_inside_superquadrics(points, y_hat)
 
@@ -397,7 +398,7 @@ def main(argv):
             val_loss_sum = .0
             val_set_size = 0
 
-            network.eval()
+            model.eval()
 
             with torch.no_grad():
                 for batch in validation_batches.get_all_batches(shuffle = False):
@@ -416,7 +417,7 @@ def main(argv):
                     val_loss_sum += loss.item() * X.size(0)
                     val_set_size += X.size(0)
 
-            network.train()
+            model.train()
 
             val_loss = val_loss_sum / val_set_size
             print(val_loss)
@@ -434,27 +435,20 @@ def main(argv):
         total_iou = .0
         n = 0
 
-        network.eval()
+        model.eval()
 
         with torch.no_grad():
-            for (volume, X, _) in test_batches.get_all_batches():
+            for (volume, _, _) in test_batches.get_all_batches():
+                X = volume.unsqueeze(1)
                 y_hat = model(X)
 
                 total_iou += iou(volume, y_hat, args).sum()
                 n += volume.size(0)
 
-        network.train()
+        model.train()
 
         mean_iou = total_iou / n
         print("epoch " + str(i + 1) + ", mean IoU = " + str(mean_iou))
-
-        torch.save(
-            model.state_dict(),
-            os.path.join(
-                experiment_directory,
-                "model.torch" # _%d" % (i + args.continue_from_epoch,)
-            )
-        )
 
     print [
         sum(losses[args.steps_per_epoch:]) / float(args.steps_per_epoch),

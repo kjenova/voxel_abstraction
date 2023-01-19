@@ -57,7 +57,7 @@ class NetworkParameters(object):
             use_deformations=use_deformations,
             train_with_bernoulli=train_with_bernoulli,
             make_dense=make_dense,
-            grid_shape=args["grid_shape"]
+            grid_shape=args["grid_shape"],
             add_coordinates_to_encoder=args.get("add_coordinates_to_encoder", False)
         )
 

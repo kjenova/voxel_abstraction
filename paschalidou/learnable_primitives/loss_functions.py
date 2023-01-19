@@ -186,7 +186,7 @@ def points_inside_superquadrics(gt_points, y_hat):
         epsilons
     )
 
-    inside = F <= 1 & exist.unsqueeze(1).repeat(1, N, 1)
+    inside = (F <= 1) & exist.unsqueeze(1).repeat(1, N, 1)
     inside_any, _ = inside.max(-1)
 
     return inside_any
