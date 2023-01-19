@@ -442,7 +442,7 @@ def main(argv):
                 X = volume.unsqueeze(1)
                 y_hat = model(X)
 
-                total_iou += iou(volume, y_hat, args).sum()
+                total_iou += iou(volume, y_hat, args).sum().item()
                 n += volume.size(0)
 
         model.train()
