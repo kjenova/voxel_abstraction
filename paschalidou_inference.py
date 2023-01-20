@@ -22,6 +22,8 @@ from loader.load_urocell import load_urocell_preprocessed
 
 from common.batch_provider import BatchProvider, BatchProviderParams
 
+from train_paschalidou import iou
+
 def get_shape_configuration(use_cuboids):
     if use_cuboids:
         return points_on_cuboid
@@ -46,13 +48,13 @@ def inference(dataset):
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=16,
+        default=32,
         help="Number of samples in a batch (default=32)"
     )
     parser.add_argument(
         "--n_primitives",
         type=int,
-        default=16,
+        default=20,
         help="Number of primitives"
     )
     parser.add_argument(
@@ -65,6 +67,11 @@ def inference(dataset):
         "--use_deformations",
         action="store_true",
         help="Use Superquadrics with deformations as the shape configuration"
+    )
+    parser.add_argument(
+        "--iou_n_points",
+        default=10000,
+        type=int
     )
 
     add_dataset_parameters(parser)
@@ -105,52 +112,60 @@ def inference(dataset):
 
     points = []
     probability = []
-    for volume, _, _ in test_batches.get_all_batches():
-        # Do the forward pass and estimate the primitive parameters
-        y_hat = model(volume.unsqueeze(1))
 
-        M = args.n_primitives  # number of primitives
-        probs = y_hat[0].to("cpu").detach().numpy()
-        # Transform the Euler angles to rotation matrices
-        if y_hat[2].shape[1] == 3:
-            R = euler_angles_to_rotation_matrices(
-                y_hat[2].view(-1, 3)
-            ).to("cpu").detach()
-        else:
-            R = quaternions_to_rotation_matrices(
-                    y_hat[2].view(-1, 4)
+    total_iou = .0
+    n = 0
+
+    with torch.no_grad():
+        for volume, _, _ in test_batches.get_all_batches():
+            # Do the forward pass and estimate the primitive parameters
+            y_hat = model(volume.unsqueeze(1))
+
+            M = args.n_primitives  # number of primitives
+            probs = y_hat[0].to("cpu").detach().numpy()
+            # Transform the Euler angles to rotation matrices
+            if y_hat[2].shape[1] == 3:
+                R = euler_angles_to_rotation_matrices(
+                    y_hat[2].view(-1, 3)
                 ).to("cpu").detach()
-            # get also the raw quaternions
-            quats = y_hat[2].view(-1, 4).to("cpu").detach().numpy()
-        translations = y_hat[1].to("cpu").view(args.n_primitives, 3)
-        translations = translations.detach().numpy()
+            else:
+                R = quaternions_to_rotation_matrices(
+                        y_hat[2].view(-1, 4)
+                    ).to("cpu").detach()
+                # get also the raw quaternions
+                quats = y_hat[2].view(-1, 4).to("cpu").detach().numpy()
+            translations = y_hat[1].to("cpu").view(args.n_primitives, 3)
+            translations = translations.detach().numpy()
 
-        shapes = y_hat[3].to("cpu").view(args.n_primitives, 3).detach().numpy()
-        epsilons = y_hat[4].to("cpu").view(
-            args.n_primitives, 2
-        ).detach().numpy()
-        taperings = y_hat[5].to("cpu").view(
-            args.n_primitives, 2
-        ).detach().numpy()
+            shapes = y_hat[3].to("cpu").view(args.n_primitives, 3).detach().numpy()
+            epsilons = y_hat[4].to("cpu").view(
+                args.n_primitives, 2
+            ).detach().numpy()
+            taperings = y_hat[5].to("cpu").view(
+                args.n_primitives, 2
+            ).detach().numpy()
 
-        primitives_points = []
-        for i in range(args.n_primitives):
-            _, _, _, p = get_shape_configuration(args.use_cuboids)(
-                shapes[i, 0],
-                shapes[i, 1],
-                shapes[i, 2],
-                epsilons[i, 0],
-                epsilons[i, 1],
-                R[i].numpy(),
-                translations[i].reshape(-1, 1),
-                taperings[i, 0],
-                taperings[i, 1]
-            )
+            primitives_points = []
+            for i in range(args.n_primitives):
+                _, _, _, p = get_shape_configuration(args.use_cuboids)(
+                    shapes[i, 0],
+                    shapes[i, 1],
+                    shapes[i, 2],
+                    epsilons[i, 0],
+                    epsilons[i, 1],
+                    R[i].numpy(),
+                    translations[i].reshape(-1, 1),
+                    taperings[i, 0],
+                    taperings[i, 1]
+                )
 
-            primitives_points.append(p.transpose())
+                primitives_points.append(p.transpose())
 
-        points.append(np.stack(primitives_points))
-        probability.append(probs[0, :])
+            points.append(np.stack(primitives_points))
+            probability.append(probs[0, :])
+
+            total_iou += iou(volume, y_hat, args).sum().item()
+            n += volume.size(0)
 
     points = np.stack(points)
     probability = np.stack(probability)
@@ -160,6 +175,9 @@ def inference(dataset):
 
     with open("results/paschalidou/probability.npy", "wb") as f:
         np.save(f, probability)
+
+    mean_iou = total_iou / n
+    print("mean IoU = " + str(mean_iou))
 
 _, test = load_urocell_preprocessed("data/chamferData/urocell")
 inference(test)

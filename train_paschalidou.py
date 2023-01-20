@@ -139,7 +139,7 @@ def main(argv):
     parser.add_argument(
         "--iou_n_points",
         default=10000,
-        type=int,
+        type=int
     )
 
     parser.add_argument(

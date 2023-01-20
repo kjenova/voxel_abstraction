@@ -1,3 +1,5 @@
 python train_paschalidou.py --use_sq --minimum_number_of_primitives=1 --pcl_to_prim_loss=1.2 --prim_to_pcl_loss=0.8 --w1=1.0 --w2=0.0 --bernoulli_regularizer_weight=1.0 --parsimony_regularizer_weight=0.001 --sqrt_in_parsimony_loss
+python paschalidou_inference.py --use_sq --pcl_to_prim_loss=1.2 --prim_to_pcl_loss=0.8
 
 python train_paschalidou.py --use_sq
+python paschalidou_inference.py --use_sq

@@ -157,10 +157,10 @@ def sample_uniformly_from_cubes_surface(shape_params, epsilons, sampler):
     return X_SQ, normals
 
 
-def points_inside_superquadrics(gt_points, y_hat):
+def points_inside_superquadrics(points, y_hat):
     # Declare some variables
-    B = gt_points.shape[0]  # batch size
-    N = gt_points.shape[1]  # number of points per sample
+    B = points.shape[0]  # batch size
+    N = points.shape[1]  # number of points per sample
     M = y_hat[0].shape[1]  # number of primitives
 
     probs = y_hat[0].view(B, M)
@@ -175,7 +175,7 @@ def points_inside_superquadrics(gt_points, y_hat):
     # Transform the 3D points from world-coordinates to primitive-centric
     # coordinates with size BxNxMx3
     X_transformed = transform_to_primitives_centric_system(
-        gt_points,
+        points,
         translations,
         rotations
     )
