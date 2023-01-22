@@ -107,7 +107,7 @@ class TulsianiNetwork(nn.Module):
 
         # Initialize some useful variables
         n_filters = 8 if network_params.add_coordinates_to_encoder else 4
-        input_channels = 1
+        input_channels = 4 if network_params.add_coordinates_to_encoder else 1
 
         encoder_layers = []
         # Create an encoder using a stack of convolutions
