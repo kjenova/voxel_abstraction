@@ -69,6 +69,10 @@ def inference(dataset):
         help="Use Superquadrics with deformations as the shape configuration"
     )
     parser.add_argument(
+        "--add_coordinates_to_encoder",
+        action="store_true"
+    )
+    parser.add_argument(
         "--iou_n_points",
         default=10000,
         type=int
