@@ -28,7 +28,7 @@ parser.add_argument('--N_k', default = 20, type = int, help = 'DGCNN paramter: K
 parser.add_argument('--N_dim_emb', default = 1024, type = int, help = 'Dimension of global feature')
 parser.add_argument('--N_dim_z', default = 512, type = int, help = 'Dimension of latent code Z')
 parser.add_argument('--N_dim_att', default = 64, type = int, help = 'Dimension of query and key in attention')
-parser.add_argument('--N_num_cubes', default = 16, type = int, help = 'Number of cuboids')
+parser.add_argument('--N_num_cubes', default = 20, type = int, help = 'Number of cuboids')
 parser.add_argument('--N_nonvariational_network', action = 'store_true')
 # Da nimamo samo enega linearnega sloja, ki iz globalnih značilk + one-hot encoding-a indeksa primitiva
 # napove parametre primitiva, ampak da tako kot v Tulsiani et al. parametre napovemo za vsak primitiv posebej.
@@ -48,7 +48,7 @@ parser.add_argument('--W_SPS', default = 0.10, type = float, help = 'SPS loss we
 parser.add_argument('--W_EXT', default = 0.01, type = float, help = 'EXT loss weight')
 parser.add_argument('--W_KLD', default = 6e-6, type = float, help = 'KLD loss weight')
 parser.add_argument('--W_CST', default = 0.00, type = float, help = 'CST loss weight, this loss is only for generation application')
-parser.add_argument('--W_min_importance_to_exist', default = 0.02, type = float)
+parser.add_argument('--W_min_importance_to_exist', default = 0.05, type = float)
 
 args = parser.parse_args()
 

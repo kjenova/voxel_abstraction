@@ -45,9 +45,9 @@ def get_primitives(out_dict, hypara):
     # exist = out_dict_1['exist']
     # exist = F.sigmoid(exist.reshape(exist.size(0), -1))
     return Primitives(
-        out_dict_1['scale'] * .5, # krat .5 zaradi kompatibilnosti s Tulsiani...
-        out_dict_1['rotate_quat'],
-        out_dict_1['pc_assign_mean'], # out_dict_1['trans'],
+        out_dict['scale'] * .5, # krat .5 zaradi kompatibilnosti s Tulsiani...
+        out_dict['rotate_quat'],
+        out_dict['pc_assign_mean'], # out_dict_1['trans'],
         assigned_existence
     )
 
@@ -243,11 +243,12 @@ def main():
                 Network.eval()
 
                 with torch.no_grad():
-                    save_points = next(test_batches.get_all_batches(shuffle = False))[1]
+                    test_data = next(test_batches.get_all_batches())
+                    save_points = test_data[1]
                     save_dict = Network(pc = save_points)
 
                     P = get_primitives(save_dict, hypara)
-                    mean_iou = iou(data[0], P, IoUParams())
+                    mean_iou = iou(test_data[0], P, IoUParams()).mean().item()
                     print(f'iter = {batch_count}, test IoU = {mean_iou}')
 
                 Network.train()
@@ -269,7 +270,7 @@ def validate(hypara, validation_batches, Network, loss_func, save_path, iter, su
     Network.eval()
 
     with torch.no_grad():
-        for j, data in enumerate(validation_batches.get_all_batches(shuffle = False)):
+        for j, data in enumerate(validation_batches.get_all_batches()):
             volume, points, closest_points, normals = data
 
             outdict = Network(pc = points)

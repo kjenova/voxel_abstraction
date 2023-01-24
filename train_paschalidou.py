@@ -401,7 +401,7 @@ def main(argv):
             model.eval()
 
             with torch.no_grad():
-                for batch in validation_batches.get_all_batches(shuffle = False):
+                for batch in validation_batches.get_all_batches():
                     X, y_target = batch[:2]
                     X = X.unsqueeze(1)
 
