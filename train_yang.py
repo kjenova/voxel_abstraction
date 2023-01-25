@@ -42,12 +42,12 @@ def get_primitives(out_dict, hypara):
     assigned_ratio = assign_matrix.mean(1)
     assigned_existence = (assigned_ratio > hypara['W']['W_min_importance_to_exist']).to(torch.float32).detach()
 
-    # exist = out_dict_1['exist']
+    # exist = out_dict['exist']
     # exist = F.sigmoid(exist.reshape(exist.size(0), -1))
     return Primitives(
         out_dict['scale'] * .5, # krat .5 zaradi kompatibilnosti s Tulsiani...
         out_dict['rotate_quat'],
-        out_dict['pc_assign_mean'], # out_dict_1['trans'],
+        out_dict['pc_assign_mean'], # out_dict['trans'],
         assigned_existence
     )
 
@@ -59,10 +59,10 @@ class ReconstructionLossParams:
 # Ko je euclidean dual loss = True, reconstruction loss-a ne računamo po
 # metodi Yang in Chen (ki upošteva normalne vektorje), temveč po "navadni"
 # formuli iz Tulsiani in sod.
-def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_updater = None):
+def compute_loss(loss_func, data, out_dict, hypara, reinforce_updater = None):
     volume, points, closest_points, normals = data
 
-    loss, loss_dict = loss_func(points, normals, out_dict_1, out_dict_2, hypara)
+    loss, loss_dict = loss_func(points, normals, out_dict, None, hypara)
 
     if not hypara['W']['W_euclidean_dual_loss']:
         return loss, loss_dict
@@ -70,7 +70,7 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_upda
     use_reinforce = False
 
     if use_reinforce:
-        prob = out_dict_1['exist']
+        prob = out_dict['exist']
 
         if False:
             prob = F.sigmoid(prob.reshape(prob.size(0), -1))
@@ -80,9 +80,9 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_upda
             log_prob = distr.log_prob(exist)
 
         P = Primitives(
-            out_dict_1['scale'] * .5, # krat .5 zaradi kompatibilnosti s Tulsiani...
-            out_dict_1['rotate_quat'],
-            out_dict_1['trans'],
+            out_dict['scale'] * .5, # krat .5 zaradi kompatibilnosti s Tulsiani...
+            out_dict['rotate_quat'],
+            out_dict['trans'],
             torch.ones(prob.size(0), prob.size(1), device = prob.device),
         )
 
@@ -104,7 +104,7 @@ def compute_loss(loss_func, data, out_dict_1, out_dict_2, hypara, reinforce_upda
             else:
                 l = r.mean()
     else:
-        P = get_primitives(P, hypara)
+        P = get_primitives(out_dict, hypara)
 
         # distance = points_to_primitives_distance_squared(P, points) # batch_size * n_cuboids * n_points
         # cov = distance * assign_matrix.transpose(1, 2)
@@ -195,8 +195,8 @@ def main():
         for i, data in enumerate(train_batches.get_all_batches(shuffle = True)):
             optimizer.zero_grad()
 
-            outdict = Network(pc = data[1])
-            loss, loss_dict = compute_loss(loss_func, data, outdict, None, hypara, reinforce_updater)
+            out_dict = Network(pc = data[1])
+            loss, loss_dict = compute_loss(loss_func, data, out_dict, hypara, reinforce_updater)
 
             loss.backward()
             optimizer.step()
@@ -273,8 +273,8 @@ def validate(hypara, validation_batches, Network, loss_func, save_path, iter, su
         for j, data in enumerate(validation_batches.get_all_batches()):
             volume, points, closest_points, normals = data
 
-            outdict = Network(pc = points)
-            _, cur_loss_dict = compute_loss(loss_func, data, outdict, None, hypara)
+            out_dict = Network(pc = points)
+            _, cur_loss_dict = compute_loss(loss_func, data, out_dict, hypara)
 
             if loss_dict:
                 for key in cur_loss_dict:
