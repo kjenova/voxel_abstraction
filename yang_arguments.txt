@@ -1,1 +1,5 @@
 python3 train_yang.py
+python3 abstraction_plot.py
+
+python3 train_yang.py --N_nonvariational_network
+python3 abstraction_plot.py --N_nonvariational_network

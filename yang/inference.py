@@ -8,6 +8,7 @@ from yang.network import Network_Whole
 from tulsiani.primitives import Primitives
 
 from common.batch_provider import BatchProvider, BatchProviderParams
+from common.iou import iou, IoUParams
 
 def inference(dataset):
     model_path = None
@@ -40,13 +41,17 @@ def inference(dataset):
     )
 
     results = []
+    
+    total_iou = .0
+    n = 0
+
     with torch.no_grad():
-        for _, points, _ in test_batches.get_all_batches():
+        for volume, points, _ in test_batches.get_all_batches():
             outdict = model(pc = points)
 
             assign_matrix = outdict['assign_matrix'] # batch_size * n_points * n_cuboids
             assigned_ratio = assign_matrix.mean(1)
-            assigned_existence = (assigned_ratio > .02).to(torch.float32).detach()
+            assigned_existence = (assigned_ratio > hypara['W']['W_min_importance_to_exist']).to(torch.float32).detach()
 
             P = Primitives(
                 outdict['scale'] * .5, # krat .5 zaradi kompatibilnosti s Tulsiani...
@@ -58,5 +63,10 @@ def inference(dataset):
             )
 
             results.append(P)
+
+            total_iou += iou(volume, P, IoUParams()).sum()
+            n += volume.size(0)
+
+    print(f'yang test IoU: {total_iou / n}')
 
     return results
