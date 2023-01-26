@@ -42,13 +42,18 @@ images = []
 p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 
 for i, shape in enumerate(dataset):
-    mesh = pv.wrap(Trimesh(shape.vertices, shape.faces - 1))
+    m = Trimesh(shape.vertices, shape.faces - 1)
+    # m.export(f'models/{i}.stl')
+    mesh = pv.wrap(m)
 
     mesh_actor = p.add_mesh(mesh)
     best_image, _ = bruteforce_view(p, n_angles, transparent = True)
     p.remove_actor(mesh_actor)
 
     images.append(best_image)
+
+# for i in range(n):
+#     images[i].save(f'images/{i}.png')
 
 embedding = TSNE(n_components = 2).fit_transform(shape_parameters)
 embedding = embedding - embedding.min(0)
