@@ -13,12 +13,14 @@ from tulsiani.inference import inference
 n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
 shape_image_size = 256
 plot_image_size = 16384
+include_existence = True
+n_dims = 11 if include_existence else 10
 
 validation, test = load_urocell_preprocessed(params.urocell_dir)
 dataset = validation + test
 n = len(dataset)
 
-shape_parameters = np.zeros((n, params.n_primitives, 10))
+shape_parameters = np.zeros((n, params.n_primitives, n_dims))
 result_batches = inference(dataset)
 
 k = 0
@@ -27,11 +29,14 @@ for batch in result_batches:
 
     shape_parameters[k : k + m, :, :3] = batch.dims.cpu().numpy()
     shape_parameters[k : k + m, :, 3:7] = batch.quat.cpu().numpy()
-    shape_parameters[k : k + m, :, 7:] = batch.trans.cpu().numpy()
+    shape_parameters[k : k + m, :, 7:10] = batch.trans.cpu().numpy()
+
+    if include_existence:
+        shape_parameters[k : k + m, :, 10] = batch.exist.cpu().numpy()
 
     k += m
 
-shape_parameters.resize((shape_parameters.shape[0], shape_parameters.shape[1] * 10))
+shape_parameters.resize((shape_parameters.shape[0], shape_parameters.shape[1] * n_dims))
 
 images = []
 p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)

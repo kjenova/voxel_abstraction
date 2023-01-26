@@ -28,10 +28,10 @@ def inference(dataset):
                 [torch.Tensor(s.resized_volume) for s in dataset[start : start + params.batch_size]]
             )
             P = model(batch)
+            P.exist = (P.prob > .5).long()
 
             results.append(P)
 
-            P.exist = (P.prob > .5).long()
             total_iou += iou(batch, P, params).sum()
             n += P.dims.size(0)
 
