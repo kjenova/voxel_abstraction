@@ -8,6 +8,7 @@ from skimage import measure
 from skimage.transform import resize
 from tqdm import tqdm
 from trimesh import Trimesh, proximity
+import open3d as o3d
 
 # V tej skripti se vse predprocesiranje izvaja v Python-u (namesto Matlab-u),
 # ampak se ne uporablja, ker je prepočasno.
@@ -103,12 +104,11 @@ def voxel_center_points(size):
     y = centers_linspace(size[1])
     z = centers_linspace(size[2])
 
-    return torch.cartesian_prod(x, y, z)
+    return torch.cartesian_prod(x, y, z).reshape(-1, 3)
 
 # Tukaj za najbližjo točko vzamemo kar center najbližjega voksla:
 def _closest_points_grid(volume):
     centers = voxel_center_points(volume.shape)
-    centers = centers.reshape(-1, 3)
     n_points = centers.size(0)
 
     distances = torch.cdist(centers, centers)
@@ -120,13 +120,22 @@ def _closest_points_grid(volume):
     return centers[inds, :]
 
 # Prepočasno!
-def closest_points_grid(volume, volume_faces):
+def __closest_points_grid(volume, volume_faces):
     centers = voxel_center_points(volume.shape)
-    centers = centers.reshape(-1, 3)
-    n_points = centers.size(0)
 
     mesh = Trimesh(*volume_faces.get_mesh())
     return proximity.closest_point(mesh, centers)
+
+def closest_points_grid(volume, volume_faces):
+    mesh = Trimesh(*volume_faces.get_mesh()).as_open3d
+    mesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
+
+    scene = o3d.t.geometry.RaycastingScene()
+    scene.add_triangles(mesh)
+
+    centers = o3d.core.Tensor(voxel_center_points(volume.shape).numpy())
+    return scene.compute_closest_points(centers)['points'].numpy()
+
 
 class Shape:
     def __init__(self, volume, grid_size, n_points_per_shape):
