@@ -93,14 +93,12 @@ class VolumeFaces:
 
     def get_interpolated_normals(self, points):
         with torch.no_grad():
-            distances = torch.cdist(points, self.face_centers)
+            distances = torch.cdist(torch.from_numpy(points), torch.from_numpy(self.face_centers))
             d, i = torch.topk(distances, 6, dim = -1, largest = False, sorted = False)
             d = 1 / d
-            d /= d.sum(-1)
-            d = d.unsqueeze(-1)
-            normals = (self.normals[i] * d).sum(1)
-
-        return normals.numpy()
+            d /= d.sum(-1, keepdim = True)
+            d = d.unsqueeze(-1).numpy()
+            return (self.normals[i] * d).sum(1)
 
     def sample(self, n_points):
         sampled_faces = np.random.randint(self.n_faces, size = n_points)

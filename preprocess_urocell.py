@@ -1,6 +1,7 @@
 import nibabel
 import torch
 import open3d as o3d
+import os
 from tqdm import tqdm
 from skimage import measure
 from trimesh import Trimesh
@@ -30,7 +31,7 @@ def preprocess(basedir, grid_size = 64, n_points_per_shape = 10000):
         volume = nibabel.load(f'{basedir}/{file}')
         volume = volume.get_fdata()
 
-        volume_name = volume.replace('.nii.gz', '')
+        volume_name = file.replace('.nii.gz', '')
 
         for label, indices in enumerate(indices_by_label):
             v = volume == (label + 1)
@@ -38,13 +39,16 @@ def preprocess(basedir, grid_size = 64, n_points_per_shape = 10000):
             props = measure.regionprops(labelled)
             props.sort(key = lambda x: x.area, reverse = True)
 
+            dir = f'data/urocell/{volume_name}/{label + 1}'
+            os.makedirs(dir, exist_ok = True)
+
             for i, p in enumerate(props):
-                shapes.append((component, f'data/{volume_name}/{label + 1}/{i + 1}.mat'))
+                shapes.append((p.filled_image, f'{dir}/{i + 1}.mat'))
 
     with torch.no_grad():
         c = centers_linspace(grid_size)
         voxel_centers = torch.cartesian_prod(c, c, c).reshape(-1, 3)
-        voxel_centers = o3d.core.Tensor(voxel_center_points.numpy())
+        voxel_centers = o3d.core.Tensor(voxel_centers.numpy())
 
     for volume, file in tqdm(shapes):
         resized_volume = resize_volume(volume, grid_size)
@@ -64,7 +68,5 @@ def preprocess(basedir, grid_size = 64, n_points_per_shape = 10000):
             'vertices': mesh.vertices,
             'faces': mesh.faces + 1
         })
-
-    return validation, test
 
 preprocess('matlab/branched')
