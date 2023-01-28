@@ -3,6 +3,7 @@ from trimesh import Trimesh
 from PIL import Image
 import pyvista as pv
 from sklearn.manifold import TSNE
+from tqdm import tqdm
 
 from loader.load_urocell import load_urocell_preprocessed
 from graphics.bruteforce_view import bruteforce_view
@@ -19,6 +20,7 @@ n_dims = 11 if include_existence else 10
 validation, test = load_urocell_preprocessed(params.urocell_dir)
 dataset = validation + test
 n = len(dataset)
+print(n)
 
 shape_parameters = np.zeros((n, params.n_primitives, n_dims))
 result_batches = inference(dataset)
@@ -41,7 +43,7 @@ shape_parameters.resize((shape_parameters.shape[0], shape_parameters.shape[1] * 
 images = []
 p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 
-for i, shape in enumerate(dataset):
+for i, shape in enumerate(tqdm(dataset)):
     m = Trimesh(shape.vertices, shape.faces - 1)
     # m.export(f'models/{i}.stl')
     mesh = pv.wrap(m)

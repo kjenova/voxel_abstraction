@@ -14,36 +14,39 @@ class UroCellShape:
         self.volume = volume
         self.resized_volume = resize_volume(volume, grid_size)
         self.volume_faces = VolumeFaces(volume)
-        # self.shape_points = self.volume_faces.sample(n_points_per_shape)
-        # self.closest_points_grid = closest_points_grid(self.resized_volume, self.volume_faces)
 
 test_data = [
-    ('fib1-1-0-3.nii.gz', [[0], [1, 2]]),
-    ('fib1-3-2-1.nii.gz', [[0, 1], [18]]),
-    ('fib1-3-3-0.nii.gz', [[0, 3], [0]]),
-    ('fib1-4-3-0.nii.gz', [[0], []])
+    'fib1-0-0-0.nii.gz',
+    'fib1-1-0-3.nii.gz',
+    'fib1-3-2-1.nii.gz',
+    'fib1-3-3-0.nii.gz',
+    'fib1-4-3-0.nii.gz'
 ]
 
 def preprocess(basedir, grid_size = 64, n_points_per_shape = 10000):
     shapes = []
 
-    for file, indices_by_label in test_data:
+    for file in test_data:
         volume = nibabel.load(f'{basedir}/{file}')
         volume = volume.get_fdata()
 
         volume_name = file.replace('.nii.gz', '')
 
-        for label, indices in enumerate(indices_by_label):
-            v = volume == (label + 1)
-            labelled = measure.label(volume)
+        for label in [1, 2]:
+            labelled = measure.label(volume == label)
             props = measure.regionprops(labelled)
             props.sort(key = lambda x: x.area, reverse = True)
 
-            dir = f'data/urocell/{volume_name}/{label + 1}'
+            dir = f'data/urocell/{volume_name}/{label}'
             os.makedirs(dir, exist_ok = True)
 
             for i, p in enumerate(props):
+                if p.area < 2:
+                    break
+
                 shapes.append((p.filled_image, f'{dir}/{i + 1}.mat'))
+
+    print(len(shapes))
 
     with torch.no_grad():
         c = centers_linspace(grid_size)

@@ -111,12 +111,12 @@ def main(argv):
     )
     parser.add_argument(
         "--train_dir",
-        default="data/chamferData/01",
+        default="data/train",
         help="Path to the directory containing the dataset"
     )
     parser.add_argument(
         "--urocell_dir",
-        default="data/chamferData/urocell"
+        default="data/urocell"
     )
     parser.add_argument(
         "--output_directory",

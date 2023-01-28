@@ -8,8 +8,8 @@ parser.add_argument('--E_name', default = 'EXP_1', type = str, help = 'Experimen
 parser.add_argument('--E_freq_val_epoch', default = 1, type = float, help = 'Frequency of validation')
 parser.add_argument('--E_freq_print_iter', default = 10, type = int, help = 'Frequency of print')
 parser.add_argument('--E_CUDA', default = 1, type = int, help = 'Index of CUDA')
-parser.add_argument('--E_train_dir', default = 'data/chamferData/01', type = str)
-parser.add_argument('--E_urocell_dir', default = 'data/chamferData/urocell', type = str)
+parser.add_argument('--E_train_dir', default = 'data/train', type = str)
+parser.add_argument('--E_urocell_dir', default = 'data/urocell', type = str)
 parser.add_argument('--E_save_dir', default = 'results/yang', type = str)
 
 parser.add_argument('--E_dont_use_split', action = 'store_true')

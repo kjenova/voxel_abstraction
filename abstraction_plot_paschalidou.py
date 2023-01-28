@@ -20,7 +20,7 @@ for i in range(10):
     pcd.points = o3d.utility.Vector3dVector(points[i].reshape(-1, 3))
     o3d.io.write_point_cloud("results/paschalidou/" + str(i + 1) + ".ply", pcd)
 
-_, test = load_urocell_preprocessed("data/chamferData/urocell")
+_, test = load_urocell_preprocessed("data/urocell")
 
 prob_threshold = .5
 

@@ -29,8 +29,8 @@ class TulsianiParams:
 
 params = TulsianiParams()
 
-params.train_dir = 'data/chamferData/01'
-params.urocell_dir = 'data/chamferData/urocell'
+params.train_dir = 'data/train'
+params.urocell_dir = 'data/urocell'
 
 # Ali naj imamo sploh ločeno učno, validacijsko in testno množico?
 params.use_split = True

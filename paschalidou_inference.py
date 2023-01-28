@@ -183,6 +183,6 @@ def inference(dataset):
     mean_iou = total_iou / n
     print("mean IoU = " + str(mean_iou))
 
-_, test = load_urocell_preprocessed("data/chamferData/urocell")
+_, test = load_urocell_preprocessed("data/urocell")
 inference(test)
 
