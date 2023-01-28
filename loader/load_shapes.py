@@ -74,6 +74,7 @@ class VolumeFaces:
         tangents /= m
 
         self.face_centers = face_centers
+        self.normals = normals
         self.tangents = tangents
 
     def get_mesh(self):
@@ -89,6 +90,17 @@ class VolumeFaces:
         faces = faces.reshape(-1, 3)
 
         return vertices, faces
+
+    def get_interpolated_normals(self, points):
+        with torch.no_grad():
+            distances = torch.cdist(points, self.face_centers)
+            d, i = torch.topk(distances, 6, dim = -1, largest = False, sorted = False)
+            d = 1 / d
+            d /= d.sum(-1)
+            d = d.unsqueeze(-1)
+            normals = (self.normals[i] * d).sum(1)
+
+        return normals.numpy()
 
     def sample(self, n_points):
         sampled_faces = np.random.randint(self.n_faces, size = n_points)
@@ -126,15 +138,14 @@ def __closest_points_grid(volume, volume_faces):
     mesh = Trimesh(*volume_faces.get_mesh())
     return proximity.closest_point(mesh, centers)
 
-def closest_points_grid(volume, volume_faces):
-    mesh = Trimesh(*volume_faces.get_mesh()).as_open3d
+def closest_points_grid(volume, mesh, points): # volume_faces):
+    # mesh = Trimesh(*volume_faces.get_mesh()).as_open3d
     mesh = o3d.t.geometry.TriangleMesh.from_legacy(mesh)
 
     scene = o3d.t.geometry.RaycastingScene()
     scene.add_triangles(mesh)
 
-    centers = o3d.core.Tensor(voxel_center_points(volume.shape).numpy())
-    return scene.compute_closest_points(centers)['points'].numpy()
+    return scene.compute_closest_points(points)['points'].numpy()
 
 
 class Shape:
