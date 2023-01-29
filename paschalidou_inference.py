@@ -74,7 +74,7 @@ def inference(dataset):
     )
     parser.add_argument(
         "--iou_n_points",
-        default=10000,
+        default=100000,
         type=int
     )
 

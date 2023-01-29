@@ -32,7 +32,7 @@ def inference(dataset):
 
             results.append(P)
 
-            total_iou += iou(batch, P, params).sum()
+            total_iou += iou(batch, P, IoUParams(iou_n_points = 100000)).sum()
             n += P.dims.size(0)
 
         print(f'tulsiani test IoU: {total_iou / n}')
