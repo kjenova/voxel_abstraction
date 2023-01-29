@@ -14,11 +14,15 @@ from loader.load_urocell import load_urocell_preprocessed
 shape_image_size = 512
 n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
 
-_, test = load_urocell_preprocessed(params.urocell_dir)
+_, test = load_urocell_preprocessed('data/urocell')
 
 p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 
 def test_set_plot():
+    plot_image_height = 2 * shape_image_size
+    plot_image_width = 5 * shape_image_size
+    plot_image_size = (plot_image_width, plot_image_height)
+
     volume_meshes = [pv.wrap(Trimesh(test[i].vertices, test[i].faces - 1)) for i in range(10)]
     test_set_plot = Image.new('RGB', plot_image_size, (0, 0, 0))
     best_angles = []
@@ -41,7 +45,8 @@ def normals_plot():
 
     volume_actor = p.add_mesh(mesh)
     _, best_angles = bruteforce_view(p, n_angles)
-    arrows_actor = p.add_arrows(x.shape_points, x.normals, mag = 0.2, show_scalar_bar = False)
+    n = 100
+    arrows_actor = p.add_arrows(x.shape_points[:n, :], x.normals[:n, :], mag = 0.2, show_scalar_bar = False)
 
     image = rotate_scene(p, *best_angles)
     image.save('analysis/normals.png')
