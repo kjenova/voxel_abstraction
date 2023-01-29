@@ -72,4 +72,4 @@ def preprocess(basedir, grid_size = 64, n_points_per_shape = 10000):
             'faces': mesh.faces + 1
         })
 
-preprocess('matlab/branched')
+preprocess('urocell/branched')
