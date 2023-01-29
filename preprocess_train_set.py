@@ -1,7 +1,7 @@
 import nibabel
 import os
 from skimage import measure
-from scipy.ndimage.morphology import binary_erosion, ball
+from skimage.morphology import binary_erosion, ball
 
 from loader.preprocess import preprocess
 
@@ -22,7 +22,10 @@ def get_components(radius = 3):
 
 def preprocess_train_set():
     components = get_components()
-    data = [c, f'data/train/{i + 1}.mat' for i, c in enumerate(components[:2000])]
+
+    os.makedirs('data/train', exist_ok = True)
+    data = [(c, f'data/train/{i + 1}.mat') for i, c in enumerate(components[:2000])]
+
     preprocess(data)
 
 if __name__ == "__main__":
