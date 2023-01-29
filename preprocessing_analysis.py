@@ -12,7 +12,7 @@ from graphics.bruteforce_view import rotate_scene, bruteforce_view
 from loader.load_urocell import load_urocell_preprocessed
 from loader.load_shapes import resize_volume, VolumeFaces
 
-from .preprocess_train_set import get_components
+from preprocess_train_set import get_components
 
 shape_image_size = 512
 n_angles = 8 # Število vrednosti elevation in azimuth kota kamere
@@ -45,7 +45,7 @@ def test_set_plot():
 def erosion_plot():
     components_by_radius = [get_components(r) for r in range(1, 7)]
 
-    for c in range(5, 6):
+    for c in range(10):
         plot = Image.new('RGB', (3 * shape_image_size, 2 * shape_image_size), (0, 0, 0))
         best_angles = None
 
