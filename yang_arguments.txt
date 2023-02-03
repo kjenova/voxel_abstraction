@@ -4,17 +4,23 @@ python3 abstraction_plot.py
 python3 train_yang.py --N_nonvariational_network
 python3 abstraction_plot.py --N_nonvariational_network
 
+python3 train_yang.py --W_euclidean_dual_loss
+python3 abstraction_plot.py --W_euclidean_dual_loss
+
 python3 train_yang.py --N_nonvariational_network --W_euclidean_dual_loss
 python3 abstraction_plot.py --N_nonvariational_network --W_euclidean_dual_loss
 
 python3 train_yang.py --N_separate_primitive_encoding --N_nonvariational_network --W_euclidean_dual_loss
 python3 abstraction_plot.py --N_separate_primitive_encoding --N_nonvariational_network --W_euclidean_dual_loss
 
+python3 train_yang.py --N_nonvariational_network --W_euclidean_dual_loss --W_min_importance_to_exist=0.02
+python3 abstraction_plot.py --N_nonvariational_network --W_euclidean_dual_loss --W_min_importance_to_exist=0.02
+
 python3 train_yang.py --N_separate_primitive_encoding --N_nonvariational_network --W_euclidean_dual_loss --W_min_importance_to_exist=0.02
 python3 abstraction_plot.py --N_separate_primitive_encoding --N_nonvariational_network --W_euclidean_dual_loss --W_min_importance_to_exist=0.02
 
-python3 train_yang.py --N_separate_primitive_encoding --N_nonvariational_network --W_euclidean_dual_loss --W_use_chamfer
-python3 abstraction_plot.py --N_separate_primitive_encoding --N_nonvariational_network --W_euclidean_dual_loss --W_use_chamfer
+python3 train_yang.py --N_separate_primitive_encoding --N_nonvariational_network --W_euclidean_dual_loss --W_min_importance_to_exist=0.02 --W_use_chamfer
+python3 abstraction_plot.py --N_separate_primitive_encoding --N_nonvariational_network --W_euclidean_dual_loss --W_min_importance_to_exist=0.02 --W_use_chamfer
 
-python3 train_yang.py --E_dont_use_split --N_separate_primitive_encoding --N_nonvariational_network --W_euclidean_dual_loss
-python3 abstraction_plot.py --E_dont_use_split --N_separate_primitive_encoding --N_nonvariational_network --W_euclidean_dual_loss
+python3 train_yang.py --E_dont_use_split --N_separate_primitive_encoding --N_nonvariational_network --W_euclidean_dual_loss --W_min_importance_to_exist=0.02
+python3 abstraction_plot.py --E_dont_use_split --N_separate_primitive_encoding --N_nonvariational_network --W_euclidean_dual_loss --W_min_importance_to_exist=0.02
