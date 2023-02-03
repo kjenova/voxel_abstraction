@@ -10,7 +10,7 @@ from tulsiani.primitives import Primitives
 from common.batch_provider import BatchProvider, BatchProviderParams
 from common.iou import iou, IoUParams
 
-def inference(dataset):
+def inference(dataset, embedding_mode = False):
     model_path = None
     max_iter = -1
     for filename in glob(f"{save_path}/*.pth"):
@@ -53,20 +53,25 @@ def inference(dataset):
             assigned_ratio = assign_matrix.mean(1)
             assigned_existence = (assigned_ratio > hypara['W']['W_min_importance_to_exist']).to(torch.float32).detach()
 
+            scale = outdict['scale']
+            if not embedding_mode:
+                scale *= .5 # krat .5 zaradi kompatibilnosti s Tulsiani...
+
             P = Primitives(
-                outdict['scale'] * .5, # krat .5 zaradi kompatibilnosti s Tulsiani...
+                scale,
                 outdict['rotate_quat'],
                 outdict['pc_assign_mean'],
                 assigned_existence,
-                assigned_existence,
-                None
+                prob = assigned_ratio
             )
 
             results.append(P)
 
-            total_iou += iou(volume, P, IoUParams(iou_n_points = 100000)).sum()
-            n += volume.size(0)
+            if not embedding_mode:
+                total_iou += iou(volume, P, IoUParams(iou_n_points = 100000)).sum()
+                n += volume.size(0)
 
-    print(f'yang test IoU: {total_iou / n}')
+    if not embedding_mode:
+        print(f'yang test IoU: {total_iou / n}')
 
     return results
