@@ -27,15 +27,15 @@ print(f'branched: {len(branched)}')
 def get_results(x):
     result_batches = tulsiani_inference(x) if method == 'tulsiani' else yang_inference(x, embedding_mode = True)
 
-    n = len(dims)
+    n = len(x)
 
     if use_internal_representation:
-        dims = result_batches[0].outdict['x_cuboid'].size()
+        dims = result_batches[0].outdict['z'].size()
         shape_parameters = np.zeros((n, dims[1], dims[2]))
 
         k = 0
         for batch in result_batches:
-            representation = batch.outdict['x_cuboid']
+            representation = batch.outdict['z']
             m = representation.size(0)
 
             shape_parameters[k : k + m, ...] = representation.cpu().numpy()
@@ -61,6 +61,7 @@ def get_results(x):
             k += m
 
     shape_parameters.resize((n, shape_parameters.shape[1] * shape_parameters.shape[2]))
+    return shape_parameters
 
 branched = get_results(branched)
 unbranched = get_results(unbranched)
@@ -79,7 +80,7 @@ def avg_dist(a, b):
     return torch.cdist(a, b).mean(-1)
 
 with torch.no_grad():
-    for _ in range(n_tries):
+    for _ in range(n_experiments):
         b1, b2 = split(branched)
         u1, u2 = split(unbranched)
 
@@ -101,5 +102,10 @@ with torch.no_grad():
             else:
                 confusion_matrix[0, 1] += 1 # false positive
 
-confusion_matrix /= n_tries
+precision = confusion_matrix[1, 1] / confusion_matrix[:, 1].sum()
+print(f'precision: {precision}')
+recall = confusion_matrix[1, 1] / confusion_matrix[1, :].sum()
+print(f'recall: {recall}')
+
+confusion_matrix /= n_experiments * (len(branched) // 2 + len(unbranched) // 2)
 print(confusion_matrix)
