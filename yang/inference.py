@@ -65,6 +65,8 @@ def inference(dataset, embedding_mode = False):
                 prob = assigned_ratio
             )
 
+            P.outdict = outdict
+
             results.append(P)
 
             if not embedding_mode:

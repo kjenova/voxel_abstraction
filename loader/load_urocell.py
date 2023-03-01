@@ -18,6 +18,8 @@ def load_urocell_preprocessed(basedir):
             loaded = load_preprocessed(basedir + '/' + subvolume_dir.replace(".nii.gz", "") + '/' + str(label + 1))
             
             for i in range(len(loaded)):
+                loaded[i].branched = label == 0
+
                 if i in indices_by_label[label]:
                     test.append(loaded[i])
                 else:
