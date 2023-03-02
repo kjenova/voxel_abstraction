@@ -2,6 +2,7 @@ import nibabel
 from .load_preprocessed import load_preprocessed
 
 test_data = [
+    # ('fib1-0-0-0.nii.gz', [[], []]), # Tegale sem pozabil prej, tako da ni trenirano na njem. Mislim, da nima nobenih zanimivih mitohondrijev...
     ('fib1-1-0-3.nii.gz', [[0], [1, 2]]),
     ('fib1-3-2-1.nii.gz', [[0, 1], [18]]),
     ('fib1-3-3-0.nii.gz', [[0, 3], [0]]),
@@ -9,7 +10,7 @@ test_data = [
 ]
 
 # Samo tale funkcija se uporablja:
-def load_urocell_preprocessed(basedir):
+def load_urocell_preprocessed(basedir, contacting = False):
     validation = []
     test = []
 
@@ -18,7 +19,7 @@ def load_urocell_preprocessed(basedir):
             loaded = load_preprocessed(basedir + '/' + subvolume_dir.replace(".nii.gz", "") + '/' + str(label + 1))
             
             for i in range(len(loaded)):
-                loaded[i].branched = label == 0
+                loaded[i].branched = label == int(contacting)
 
                 if i in indices_by_label[label]:
                     test.append(loaded[i])

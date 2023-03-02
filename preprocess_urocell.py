@@ -12,7 +12,7 @@ test_data = [
     'fib1-4-3-0.nii.gz'
 ]
 
-def preprocess_urocell(basedir):
+def preprocess_urocell(basedir, suffix = ''):
     shapes = []
 
     for file in test_data:
@@ -26,7 +26,7 @@ def preprocess_urocell(basedir):
             props = measure.regionprops(labelled)
             props.sort(key = lambda x: x.area, reverse = True)
 
-            dir = f'data/urocell/{volume_name}/{label}'
+            dir = f'data/urocell{suffix}/{volume_name}/{label}'
             os.makedirs(dir, exist_ok = True)
 
             for i, p in enumerate(props):
@@ -41,3 +41,4 @@ def preprocess_urocell(basedir):
 
 if __name__ == "__main__":
     preprocess_urocell('urocell/branched')
+    preprocess_urocell('urocell/contacting', '_contacting')

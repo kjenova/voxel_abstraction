@@ -24,7 +24,8 @@ existence_handling = 'existence' # [ 'existence', 'probability', 'exclude' ]
 # če kamero fokusiramo na ploščat, odrezan del...
 use_best_angles = False
 
-validation, test = load_urocell_preprocessed(params.urocell_dir)
+# validation, test = load_urocell_preprocessed('data/urocell')
+validation, test = load_urocell_preprocessed('data/urocell_contacting', contacting = True)
 dataset = validation + test
 
 n = len(dataset)
@@ -35,12 +36,15 @@ print(f'branched: {n_branched}')
 result_batches = tulsiani_inference(dataset) if method == 'tulsiani' else yang_inference(dataset, embedding_mode = True)
 
 if use_internal_representation:
-    dims = result_batches[0].outdict['z'].size()
+    # field = 'z'
+    field = 'x_cuboid'
+
+    dims = result_batches[0].outdict[field].size()
     shape_parameters = np.zeros((n, dims[1], dims[2]))
 
     k = 0
     for batch in result_batches:
-        representation = batch.outdict['z']
+        representation = batch.outdict[field]
         m = representation.size(0)
 
         shape_parameters[k : k + m, ...] = representation.cpu().numpy()

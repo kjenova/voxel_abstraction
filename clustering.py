@@ -13,7 +13,8 @@ method = 'yang'
 use_internal_representation = False
 existence_handling = 'existence' # [ 'existence', 'probability', 'exclude' ]
 
-validation, test = load_urocell_preprocessed(params.urocell_dir)
+validation, test = load_urocell_preprocessed('data/urocell')
+# validation, test = load_urocell_preprocessed('data/urocell_contacting', contacting = True)
 dataset = validation + test
 
 branched = [x for x in dataset if x.branched]
@@ -30,12 +31,15 @@ def get_results(x):
     n = len(x)
 
     if use_internal_representation:
-        dims = result_batches[0].outdict['z'].size()
+        # field = 'z'
+        field = 'x_cuboid'
+
+        dims = result_batches[0].outdict[field].size()
         shape_parameters = np.zeros((n, dims[1], dims[2]))
 
         k = 0
         for batch in result_batches:
-            representation = batch.outdict['z']
+            representation = batch.outdict[field]
             m = representation.size(0)
 
             shape_parameters[k : k + m, ...] = representation.cpu().numpy()
