@@ -24,8 +24,8 @@ existence_handling = 'existence' # [ 'existence', 'probability', 'exclude' ]
 # če kamero fokusiramo na ploščat, odrezan del...
 use_best_angles = False
 
-# validation, test = load_urocell_preprocessed('data/urocell')
-validation, test = load_urocell_preprocessed('data/urocell_contacting', contacting = True)
+validation, test = load_urocell_preprocessed('data/urocell')
+# validation, test = load_urocell_preprocessed('data/urocell_contacting', contacting = True)
 dataset = validation + test
 
 n = len(dataset)
