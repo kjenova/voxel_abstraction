@@ -64,7 +64,10 @@ def plot_predictions(X, method, transparent = False):
 
     predictions_vertices = predictions_to_mesh_vertices(X).cpu()
     for i, volume_mesh in enumerate(volume_meshes):
-        v = predictions_vertices[i, X.prob[i].cpu() > prob_threshold].numpy()
+        if method == 'tulsiani':
+            v = predictions_vertices[i, X.prob[i].cpu() > prob_threshold].numpy()
+        else:
+            v = predictions_vertices[i, X.exist[i] == 1.].numpy()
         predictions_mesh = prediction_vertices_to_mesh(v)
 
         volume_actor = p.add_mesh(volume_mesh, opacity = .5)

@@ -74,11 +74,18 @@ confusion_matrix = np.zeros((2, 2))
 
 rng = np.random.default_rng(seed = 0x5EED)
 
-def split(x):
+def split(x, n = None):
     c = rng.choice(len(x), len(x) // 2, replace = False)
     i = np.zeros(len(x), dtype = bool)
     i[c] = True
-    return torch.tensor(x[i]), torch.tensor(x[~i])
+
+    if n is None:
+        return torch.tensor(x[i]), torch.tensor(x[~i])
+    else:
+        j = np.zeros(len(x), dtype = bool)
+        j[c[:n]] = True
+        
+        return torch.tensor(x[i]), torch.tensor(x[j])
 
 def avg_dist(a, b):
     return torch.cdist(a, b).mean(-1)
@@ -111,5 +118,5 @@ print(f'precision: {precision}')
 recall = confusion_matrix[1, 1] / confusion_matrix[1, :].sum()
 print(f'recall: {recall}')
 
-confusion_matrix /= n_experiments * (len(branched) // 2 + len(unbranched) // 2)
+confusion_matrix /= confusion_matrix.sum()
 print(confusion_matrix)
