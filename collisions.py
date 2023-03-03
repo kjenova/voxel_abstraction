@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import random
 from trimesh import Trimesh
 from trimesh.collision import CollisionManager
 
@@ -29,38 +30,48 @@ def prediction_vertices_to_mesh(vertices):
 
     return Trimesh(vertices.reshape(-1, 3), f.reshape(-1, 4))
 
-_, test = load_urocell_preprocessed('data/urocell')
+# _, test = load_urocell_preprocessed('data/urocell')
+validation, test = load_urocell_preprocessed('data/urocell')
+dataset = validation + test
+
+branched = [x for x in dataset if x.branched]
+unbranched = [x for x in dataset if not x.branched]
 
 p = pv.Plotter(off_screen = True, window_size = [512] * 2)
 
-result_batches = inference(test)
-j = 0
-for batch in result_batches:
-    m = batch.dims.argmax(-1)
-    batch.dims[m] *= elongation_factor
+def process(x, dir):
+    result_batches = inference(x)
+    j = 0
+    for batch in result_batches:
+        m = batch.dims.argmax(-1)
+        batch.dims[m] *= elongation_factor
 
-    vertices = predictions_to_mesh_vertices(batch).cpu()
+        vertices = predictions_to_mesh_vertices(batch).cpu()
 
-    for i in range(vertices.shape[0]):
-        v = vertices[i, batch.exist[i] == 1.].numpy()
-        mesh = prediction_vertices_to_mesh(v)
+        for i in range(vertices.shape[0]):
+            v = vertices[i, batch.exist[i] == 1.].numpy()
+            mesh = prediction_vertices_to_mesh(v)
 
-        actor = p.add_mesh(pv.wrap(mesh))
-        image, _ = bruteforce_view(p, 8)
-        p.remove_actor(actor)
+            actor = p.add_mesh(pv.wrap(mesh))
+            image, _ = bruteforce_view(p, 8)
+            p.remove_actor(actor)
 
-        image.save(f'collisions/mesh_{j}.png')
+            image.save(f'{dir}/mesh_{j}.png')
 
-        manager = CollisionManager()
-        for k in range(v.shape[0]):
-            primitive_mesh = prediction_vertices_to_mesh(v[k : (k + 1)])
-            manager.add_object(str(k), primitive_mesh)
+            manager = CollisionManager()
+            for k in range(v.shape[0]):
+                primitive_mesh = prediction_vertices_to_mesh(v[k : (k + 1)])
+                manager.add_object(str(k), primitive_mesh)
 
-        _, collisions = manager.in_collision_internal(return_names = True)
+            _, collisions = manager.in_collision_internal(return_names = True)
 
-        graph = nx.Graph(collisions)
-        nx.draw(graph)
-        plt.savefig(f'collisions/graph_{j}.png')
-        plt.clf()
+            graph = nx.Graph(collisions)
+            nx.draw(graph)
+            plt.savefig(f'{dir}/graph_{j}.png')
+            plt.clf()
 
-        j += 1
+            j += 1
+
+process(branched, 'collisions/branched')
+random.shuffle(unbranched)
+process(unbranched[:20], 'collisions/unbranched')

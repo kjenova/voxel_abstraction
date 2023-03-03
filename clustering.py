@@ -7,6 +7,8 @@ from tulsiani.parameters import params
 from tulsiani.inference import inference as tulsiani_inference
 from yang.inference import inference as yang_inference
 
+from sklearn.svm import SVC
+
 method = 'yang'
 
 # Da namesto parametrov primitivov vložimo notranjo predstavitev oblike v nevronski mreži:
@@ -70,8 +72,6 @@ def get_results(x):
 branched = get_results(branched)
 unbranched = get_results(unbranched)
 
-confusion_matrix = np.zeros((2, 2))
-
 rng = np.random.default_rng(seed = 0x5EED)
 
 def split(x, n = None):
@@ -90,33 +90,65 @@ def split(x, n = None):
 def avg_dist(a, b):
     return torch.cdist(a, b).mean(-1)
 
-with torch.no_grad():
-    for _ in range(n_experiments):
-        b1, b2 = split(branched)
-        u1, u2 = split(unbranched)
+def print_results(confusion_matrix):
+    precision = confusion_matrix[1, 1] / confusion_matrix[:, 1].sum()
+    print(f'precision: {precision}')
+    recall = confusion_matrix[1, 1] / confusion_matrix[1, :].sum()
+    print(f'recall: {recall}')
 
-        bb = avg_dist(b1, b2)
-        bu = avg_dist(b1, u2)
+    confusion_matrix /= confusion_matrix.sum()
+    print(confusion_matrix)
 
-        for i in range(len(b1)):
-            if bb[i] < bu[i]:
-                confusion_matrix[1, 1] += 1 # true positive
-            else:
-                confusion_matrix[1, 0] += 1 # false negative
+def test_avg_dist():
+    confusion_matrix = np.zeros((2, 2))
 
-        ub = avg_dist(u1, b2)
-        uu = avg_dist(u1, u2)
+    with torch.no_grad():
+        for _ in range(n_experiments):
+            b1, b2 = split(branched)
+            u1, u2 = split(unbranched)
 
-        for i in range(len(u1)):
-            if uu[i] < ub[i]:
-                confusion_matrix[0, 0] += 1 # true negative
-            else:
-                confusion_matrix[0, 1] += 1 # false positive
+            bb = avg_dist(b1, b2)
+            bu = avg_dist(b1, u2)
 
-precision = confusion_matrix[1, 1] / confusion_matrix[:, 1].sum()
-print(f'precision: {precision}')
-recall = confusion_matrix[1, 1] / confusion_matrix[1, :].sum()
-print(f'recall: {recall}')
+            for i in range(len(b1)):
+                if bb[i] < bu[i]:
+                    confusion_matrix[1, 1] += 1 # true positive
+                else:
+                    confusion_matrix[1, 0] += 1 # false negative
 
-confusion_matrix /= confusion_matrix.sum()
-print(confusion_matrix)
+            ub = avg_dist(u1, b2)
+            uu = avg_dist(u1, u2)
+
+            for i in range(len(u1)):
+                if uu[i] < ub[i]:
+                    confusion_matrix[0, 0] += 1 # true negative
+                else:
+                    confusion_matrix[0, 1] += 1 # false positive
+
+    print_results(confusion_matrix)
+
+def test_svm():
+    b1, b2 = split(branched)
+    u1, u2 = split(unbranched, 10)
+
+    X = np.vstack((b2, u2))
+    y = np.zeros(len(b2) + len(u2), dtype = int)
+    y[:len(b2)] = 1
+
+    svc = SVC()
+    svc.fit(X, y)
+
+    confusion_matrix = np.zeros((2, 2))
+
+    pb = svc.predict(b1)
+    confusion_matrix[1, 1] = pb.sum()
+    confusion_matrix[1, 0] = len(pb) - pb.sum()
+
+    pu = svc.predict(u1)
+    confusion_matrix[0, 0] = len(pu) - pu.sum()
+    confusion_matrix[0, 1] = pu.sum()
+
+    print_results(confusion_matrix)
+
+# test_avg_dist()
+test_svm()
