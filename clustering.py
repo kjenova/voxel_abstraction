@@ -87,8 +87,9 @@ def split(x, n = None):
         
         return torch.tensor(x[i]), torch.tensor(x[j])
 
-def avg_dist(a, b):
+def dist(a, b):
     return torch.cdist(a, b).mean(-1)
+    # return torch.cdist(a, b).min(-1)[0]
 
 def print_results(confusion_matrix):
     precision = confusion_matrix[1, 1] / confusion_matrix[:, 1].sum()
@@ -99,7 +100,7 @@ def print_results(confusion_matrix):
     confusion_matrix /= confusion_matrix.sum()
     print(confusion_matrix)
 
-def test_avg_dist():
+def test_dist():
     confusion_matrix = np.zeros((2, 2))
 
     with torch.no_grad():
@@ -107,8 +108,8 @@ def test_avg_dist():
             b1, b2 = split(branched)
             u1, u2 = split(unbranched)
 
-            bb = avg_dist(b1, b2)
-            bu = avg_dist(b1, u2)
+            bb = dist(b1, b2)
+            bu = dist(b1, u2)
 
             for i in range(len(b1)):
                 if bb[i] < bu[i]:
@@ -116,8 +117,8 @@ def test_avg_dist():
                 else:
                     confusion_matrix[1, 0] += 1 # false negative
 
-            ub = avg_dist(u1, b2)
-            uu = avg_dist(u1, u2)
+            ub = dist(u1, b2)
+            uu = dist(u1, u2)
 
             for i in range(len(u1)):
                 if uu[i] < ub[i]:
@@ -150,5 +151,5 @@ def test_svm():
 
     print_results(confusion_matrix)
 
-# test_avg_dist()
-test_svm()
+test_dist()
+# test_svm()

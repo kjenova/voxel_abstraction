@@ -17,6 +17,8 @@ from graphics.bruteforce_view import rotate_scene, bruteforce_view
 import networkx as nx
 import matplotlib.pyplot as plt
 
+import geomstats.visualization as visualization
+
 prob_threshold = .5
 # Kvadre podaljšamo vzdolž največje dimenzije, da dodamo "manevrski prostor"
 # za kolizije med bližnjimi predmeti.
@@ -50,6 +52,7 @@ def process(x, dir):
 
         for i in range(vertices.shape[0]):
             v = vertices[i, batch.exist[i] == 1.].numpy()
+
             mesh = prediction_vertices_to_mesh(v)
 
             actor = p.add_mesh(pv.wrap(mesh))
@@ -70,8 +73,27 @@ def process(x, dir):
             plt.savefig(f'{dir}/graph_{j}.png')
             plt.clf()
 
+            deltas = []
+            for a, b in collisions:
+                delta = batch.trans[i, int(b)] - batch.trans[i, int(a)]
+                delta = delta.cpu().numpy()
+                if delta[2] < 0:
+                    delta *= -1
+
+                deltas.append(delta)
+
+            deltas = np.vstack(deltas)
+            deltas /= np.linalg.norm(deltas, axis = -1, keepdims = True)
+
+            fig = plt.figure(figsize = (8, 8))
+            ax = visualization.plot(deltas, space = "S2", color = "black", alpha = .7, label = "Data")
+            ax.set_box_aspect([1, 1, 1])
+            ax.legend();
+
+            plt.savefig(f'{dir}/sphere_{j}.png')
+            plt.clf()
+
             j += 1
 
 process(branched, 'collisions/branched')
-random.shuffle(unbranched)
 process(unbranched[:20], 'collisions/unbranched')
