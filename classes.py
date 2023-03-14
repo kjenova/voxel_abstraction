@@ -25,7 +25,7 @@ p = pv.Plotter(off_screen = True, window_size = [shape_image_size] * 2)
 def plot(dataset, name):
     dataset_plot = Image.new('RGB', plot_image_size, (0, 0, 0))
     for i in range(n):
-        volume_mesh = Trimesh(datatest[i].vertices, datatest[i].faces - 1)
+        volume_mesh = Trimesh(dataset[i].vertices, dataset[i].faces - 1)
         volume_actor = p.add_mesh(volume_mesh)
         image, _ = bruteforce_view(p, n_angles)
         p.remove_actor(volume_actor)
@@ -36,16 +36,20 @@ def plot(dataset, name):
 
     dataset_plot.save(f'{name}.png')
 
-def load(dir)
-    validation, test = load_urocell_preprocessed(dir)
+def load(dir, contacting = False):
+    validation, test = load_urocell_preprocessed(dir, contacting = contacting)
     return validation + test
 
 combined = load('data/urocell')
 branched = [x for x in combined if x.branched]
+branched = [branched[i] for i in [4, 6, 10, 13, 15, 18]]
 unbranched = [x for x in combined if not x.branched]
+unbranched = [unbranched[i] for i in [0, 13, 15, 16, 17, 19]]
 
-plot(unbranched, 'normal')
 plot(branched, 'branched')
+plot(unbranched, 'normal')
 
-combined = load('data/urocell_contacting')
-plot([x for x in combined if x.branched], 'contacting')
+combined = load('data/urocell_contacting', contacting = True)
+contacting = [x for x in combined if x.branched]
+contacting = [contacting[i] for i in [1, 2, 4, 11, 18, 19]]
+plot(contacting, 'contacting')
